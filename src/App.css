@@ -1,0 +1,240 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Nunito:wght@400;600;700&display=swap');
+
+/* --- Глобальные настройки --- */
+:root {
+  --primary: #16add2;
+  --primary-dark: #128ba9;
+  --text: #1e293b;
+  --text-light: #64748b;
+  --bg: #f8fafc;
+  --white: #ffffff;
+  --danger: #ef4444;
+  --shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, html, #root {
+  width: 100% !important;
+  min-height: 100vh;
+  background-color: var(--bg);
+  font-family: 'Nunito', sans-serif;
+  color: var(--text);
+  display: block !important;
+}
+
+/* --- Header & Nav --- */
+.header {
+  height: 80px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8%;
+  background: var(--white);
+  box-shadow: 0 2px 15px rgba(0,0,0,0.04);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.logo { font-family: 'Montserrat'; font-weight: 900; font-size: 1.6rem; color: var(--text); cursor: pointer; }
+.logo span { color: var(--primary); }
+
+.nav-menu { display: flex; align-items: center; gap: 25px; }
+.nav-link { font-weight: 700; color: var(--text-light); cursor: pointer; transition: 0.3s; }
+.nav-link.active { color: var(--primary); }
+.nav-link:hover { color: var(--primary); }
+
+.user-badge { 
+  font-weight: 700; 
+  color: var(--danger); 
+  cursor: pointer; 
+  background: #fee2e2; 
+  padding: 8px 15px; 
+  border-radius: 12px; 
+  transition: 0.3s;
+}
+.user-badge:hover { background: #fecaca; }
+
+.cart-btn-main {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.cart-btn-main:hover { transform: translateY(-2px); background: var(--primary-dark); }
+
+/* --- Hero Section --- */
+.hero {
+  width: 100%;
+  height: 55vh;
+  background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1600&q=80') center/cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-align: center;
+}
+
+.hero-title {
+  font-family: 'Montserrat';
+  font-weight: 900;
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* --- Controls & Filters --- */
+.controls-section {
+  max-width: 1200px;
+  margin: -40px auto 30px;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.search-box-container {
+  width: 100%;
+  max-width: 600px;
+  background: white;
+  padding: 6px;
+  border-radius: 20px;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+}
+
+.modern-search {
+  width: 100%;
+  padding: 16px 25px;
+  border: none;
+  outline: none;
+  font-size: 1.1rem;
+  border-radius: 15px;
+}
+
+.filter-chips { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.chip { 
+  padding: 10px 24px; 
+  border-radius: 50px; 
+  border: 1px solid #e2e8f0; 
+  background: white; 
+  cursor: pointer; 
+  font-weight: 700; 
+  color: var(--text-light); 
+  transition: 0.3s;
+}
+.chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+.admin-panel-info { text-align: center; margin-bottom: 10px; }
+.admin-theme { background: #1e293b !important; margin-bottom: 5px; }
+
+/* --- Grid & Cards --- */
+.main-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 35px;
+  padding: 40px 8%;
+}
+
+.modern-card {
+  background: white;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+}
+
+.modern-card:hover { transform: translateY(-12px); box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
+
+.card-image-h { width: 100%; height: 240px; position: relative; overflow: hidden; }
+.card-image-h img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
+.modern-card:hover .card-image-h img { transform: scale(1.1); }
+
+.fav-btn-overlay {
+  position: absolute; top: 15px; right: 15px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none; width: 42px; height: 42px;
+  border-radius: 50%; cursor: pointer; font-size: 1.2rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  transition: 0.3s;
+  display: flex; align-items: center; justify-content: center;
+}
+.fav-btn-overlay.active { background: white; transform: scale(1.1); }
+
+.card-content { padding: 25px; }
+.card-content h3 { font-family: 'Montserrat'; font-size: 1.4rem; margin-bottom: 15px; }
+.card-footer-row { display: flex; justify-content: space-between; align-items: center; }
+.price { font-size: 1.7rem; font-weight: 900; color: var(--primary); }
+
+.card-buttons { display: flex; gap: 10px; }
+.add-btn {
+  background: var(--text); color: white;
+  border: none; padding: 12px 22px;
+  border-radius: 14px; font-weight: 700; cursor: pointer;
+  transition: 0.3s;
+}
+.add-btn:hover { background: var(--primary); }
+.delete-btn-admin { background: #f1f5f9; border: none; padding: 10px; border-radius: 12px; cursor: pointer; }
+
+/* --- Auth Page --- */
+.auth-page { display: flex; justify-content: center; padding-top: 60px; }
+.large-box { width: 500px !important; padding: 60px !important; }
+.auth-box { background: white; border-radius: 30px; box-shadow: var(--shadow); text-align: center; }
+.auth-form { display: flex; flex-direction: column; gap: 20px; text-align: left; margin-top: 25px; }
+.input-group { display: flex; flex-direction: column; gap: 8px; }
+.input-group label { font-weight: 700; color: var(--text-light); }
+.input-group input { padding: 16px; border-radius: 14px; border: 1.5px solid #e2e8f0; outline: none; font-size: 1rem; }
+.login-submit-btn { background: var(--primary); color: white; border: none; padding: 18px; border-radius: 14px; font-weight: 700; cursor: pointer; font-size: 1.1rem; }
+.auth-error-msg { color: var(--danger); font-weight: 700; text-align: center; }
+
+/* --- Cart Design --- */
+.cart-wrapper { max-width: 1100px; margin: 0 auto; }
+.cart-main-layout { display: flex; gap: 40px; text-align: left; align-items: flex-start; }
+.cart-items-list { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+.cart-list-header { display: flex; justify-content: flex-end; }
+.clear-cart-btn-minimal { background: transparent; border: none; color: #94a3b8; font-weight: 600; cursor: pointer; }
+
+.cart-item-card {
+  background: white; padding: 20px; border-radius: 24px;
+  display: flex; align-items: center; gap: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+}
+.cart-item-img { width: 110px; height: 85px; object-fit: cover; border-radius: 15px; }
+.cart-item-info { flex: 1; }
+.cart-item-info h4 { font-family: 'Montserrat'; font-size: 1.2rem; }
+.cart-item-price { font-size: 1.4rem; font-weight: 800; color: var(--primary); margin: 0 25px; }
+.remove-item-btn { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; transition: 0.3s; }
+.remove-item-btn:hover { background: #fee2e2; color: var(--danger); }
+
+.cart-summary-panel {
+  width: 350px; background: white; padding: 35px; border-radius: 28px;
+  box-shadow: var(--shadow); position: sticky; top: 110px;
+}
+.summary-row { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: 600; color: var(--text-light); }
+.summary-total {
+  display: flex; justify-content: space-between; margin-top: 25px;
+  padding-top: 25px; border-top: 2px solid #f1f5f9;
+  font-size: 1.6rem; font-weight: 900;
+}
+.checkout-btn { 
+  width: 100%; margin-top: 30px; padding: 18px; 
+  background: var(--text); color: white; border: none; 
+  border-radius: 16px; font-weight: 700; cursor: pointer; 
+}
+
+/* --- About & Empty States --- */
+.about-page { text-align: center; padding: 60px 8%; }
+.about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; margin-top: 50px; }
+.about-card-modern { background: white; padding: 40px; border-radius: 25px; box-shadow: var(--shadow); }
+.about-icon { font-size: 3rem; margin-bottom: 15px; }
+
+.empty-state, .empty-cart-state { padding: 100px 0; text-align: center; }
+.empty-icon { font-size: 5rem; opacity: 0.1; margin-bottom: 20px; }
+
+.page-title { font-family: 'Montserrat'; font-size: 2.5rem; margin-bottom: 40px; text-align: center; }
+.state-msg { text-align: center; padding: 100px; font-size: 1.2rem; font-weight: 700; color: var(--text-light); }
