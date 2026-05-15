@@ -3,6 +3,7 @@ import './App.css';
 
 const API_URL = 'http://localhost:5001/api/tours';
 const USER_STORAGE_KEY = 'travelLuxeUser';
+const ACCOUNT_DATA_PREFIX = 'travelLuxeAccountData';
 const emptyTourForm = { title: '', price: '', category: '', img: '' };
 const fallbackImages = {
   beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900',
@@ -12,22 +13,38 @@ const fallbackImages = {
   default: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=900'
 };
 
+const getAccountDataKey = (account) => {
+  return `${ACCOUNT_DATA_PREFIX}:${account.role}`;
+};
+
+const getSavedUser = () => {
+  const savedUser = localStorage.getItem(USER_STORAGE_KEY);
+  return savedUser ? JSON.parse(savedUser) : null;
+};
+
+const getSavedAccountData = (account) => {
+  if (!account) return { favorites: [], cart: [] };
+
+  const savedData = localStorage.getItem(getAccountDataKey(account));
+  return savedData ? JSON.parse(savedData) : { favorites: [], cart: [] };
+};
+
+const initialUser = getSavedUser();
+const initialAccountData = getSavedAccountData(initialUser);
+
 function App() {  
   const [view, setView] = useState('catalog');  
   const [tours, setTours] = useState([]);  
   const [loading, setLoading] = useState(true);  
   const [error, setError] = useState(null);  
   
-  const [cart, setCart] = useState([]);  
-  const [favorites, setFavorites] = useState([]);  
+  const [cart, setCart] = useState(initialAccountData.cart);  
+  const [favorites, setFavorites] = useState(initialAccountData.favorites);  
   
   const [search, setSearch] = useState('');  
   const [category, setCategory] = useState('Все');  
 
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem(USER_STORAGE_KEY);
-    return savedUser ? JSON.parse(savedUser) : null;
-  }); 
+  const [user, setUser] = useState(initialUser); 
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -78,6 +95,15 @@ function App() {
     fetchTours();
   }, []);  
 
+  useEffect(() => {
+    if (!user) return;
+
+    localStorage.setItem(getAccountDataKey(user), JSON.stringify({
+      favorites,
+      cart
+    }));
+  }, [favorites, cart, user]);
+
   const handleActionWithAuth = (action) => {
     if (!user) {
       alert("Для этого действия необходимо авторизоваться!");
@@ -111,6 +137,14 @@ function App() {
 
   const clearCart = () => {
     if (window.confirm("Очистить корзину?")) setCart([]);
+  };
+
+  const logout = () => {
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setUser(null);
+    setFavorites([]);
+    setCart([]);
+    setView('catalog');
   };
 
   const deleteTour = (id) => {
@@ -206,12 +240,18 @@ function App() {
     setAuthError('');
     if (loginInput === 'admin' && passwordInput === '1234') {
       const adminUser = { name: 'Администратор', role: 'admin' };
+      const savedData = getSavedAccountData(adminUser);
       setUser(adminUser);
+      setFavorites(savedData.favorites);
+      setCart(savedData.cart);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(adminUser));
       setView('catalog');
     } else if (loginInput === 'user' && passwordInput === '1111') {
       const regularUser = { name: 'Алексей', role: 'user' };
+      const savedData = getSavedAccountData(regularUser);
       setUser(regularUser);
+      setFavorites(savedData.favorites);
+      setCart(savedData.cart);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(regularUser));
       setView('catalog');
     } else {
@@ -232,7 +272,7 @@ function App() {
         <div className="logo" onClick={() => setView('catalog')}>TRAVEL<span>Luxe</span></div>  
         <nav className="nav-menu">  
           <span className={`nav-link ${view === 'catalog' ? 'active' : ''}`} onClick={() => setView('catalog')}>Каталог</span>  
-          <span className={`nav-link ${view === 'favorites' ? 'active' : ''}`} onClick={() => setView('favorites')}>Избранное ({favorites.length})</span>  
+          <span className={`nav-link ${view === 'favorites' ? 'active' : ''}`} onClick={() => handleActionWithAuth(() => setView('favorites'))}>Избранное ({user ? favorites.length : 0})</span>  
           {user?.role === 'admin' && (
             <span className={`nav-link ${view === 'admin' ? 'active' : ''}`} onClick={() => setView('admin')}>Админ</span>
           )}
@@ -241,11 +281,11 @@ function App() {
           {!user ? (
             <span className={`nav-link ${view === 'auth' ? 'active' : ''}`} onClick={() => setView('auth')}>Войти</span>
           ) : (
-            <span className="user-badge" onClick={() => { localStorage.removeItem(USER_STORAGE_KEY); setUser(null); setView('catalog'); }}>
+            <span className="user-badge" onClick={logout}>
               Выйти ({user.role === 'admin' ? 'Админ' : user.name})
             </span>
           )}
-          <button className="cart-btn-main" onClick={() => setView('cart')}>🛒 ({cart.length})</button>  
+          <button className="cart-btn-main" onClick={() => handleActionWithAuth(() => setView('cart'))}>🛒 ({user ? cart.length : 0})</button>  
         </nav>  
       </header>  
 
