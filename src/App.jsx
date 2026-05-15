@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import './App.css';  
 
 const API_URL = 'http://localhost:5001/api/tours';
+const emptyTourForm = { title: '', price: '', category: '', img: '' };
+const fallbackImages = {
+  beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900',
+  mountains: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900',
+  city: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=900',
+  nature: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=900',
+  default: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=900'
+};
 
 function App() {  
   const [view, setView] = useState('catalog');  
@@ -19,6 +27,9 @@ function App() {
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
+  const [tourForm, setTourForm] = useState(emptyTourForm);
+  const [editingTourId, setEditingTourId] = useState(null);
+  const [adminMessage, setAdminMessage] = useState('');
 
   const categories = ['Все', 'Пляж', 'Горы', 'Город', 'Природа'];  
 
@@ -26,6 +37,19 @@ function App() {
     if (user?.role === 'admin') return 'Admin';
     if (user?.role === 'user') return 'User';
     return '';
+  };
+
+  const getImageForCategory = (value) => {
+    const normalized = value.toLowerCase();
+    if (normalized.includes('пляж') || normalized.includes('море')) return fallbackImages.beach;
+    if (normalized.includes('гор')) return fallbackImages.mountains;
+    if (normalized.includes('город')) return fallbackImages.city;
+    if (normalized.includes('природ')) return fallbackImages.nature;
+    return fallbackImages.default;
+  };
+
+  const getTourImage = (tour) => {
+    return tour.img || getImageForCategory(tour.category || tour.title || '');
   };
 
   const fetchTours = () => {
@@ -94,6 +118,9 @@ function App() {
       .then(res => {
         if (res.ok) {
           setTours(tours.filter(t => t.id !== id));
+          setFavorites(favorites.filter(t => t.id !== id));
+          setCart(cart.filter(t => t.id !== id));
+          setAdminMessage('Тур удалён');
         } else {
           alert(`Ошибка при удалении: ${res.status}`);
         }
@@ -102,30 +129,72 @@ function App() {
     }
   };
 
-  const addTour = () => {
-    const title = prompt("Название тура:");
-    const price = prompt("Цена:");
-    const img = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500"; 
+  const resetTourForm = () => {
+    setTourForm(emptyTourForm);
+    setEditingTourId(null);
+    setAdminMessage('');
+  };
 
-    if (title && price) {
-      const newTour = { title, price: Number(price), img, category: "Пляж" };
-      fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Role: getRoleHeader()
-        },
-        body: JSON.stringify(newTour)
-      })
-      .then(res => {
-        if (!res.ok) throw new Error(`Ошибка добавления: ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        setTours([...tours, data]); 
-      })
-      .catch(err => alert(err.message));
+  const handleTourFormChange = (e) => {
+    const { name, value } = e.target;
+    setTourForm({ ...tourForm, [name]: value });
+  };
+
+  const startEditTour = (tour) => {
+    setTourForm({
+      title: tour.title,
+      price: String(tour.price),
+      category: tour.category,
+      img: tour.img
+    });
+    setEditingTourId(tour.id);
+    setAdminMessage('');
+    setView('admin');
+  };
+
+  const saveTour = (e) => {
+    e.preventDefault();
+    const tourData = {
+      title: tourForm.title.trim(),
+      price: Number(tourForm.price),
+      category: tourForm.category.trim(),
+      img: tourForm.img.trim() || getImageForCategory(tourForm.category || tourForm.title)
+    };
+
+    if (!tourData.title || !tourData.price || !tourData.category) {
+      setAdminMessage('Заполните название, цену и категорию');
+      return;
     }
+
+    const url = editingTourId ? `${API_URL}/${editingTourId}` : API_URL;
+    const method = editingTourId ? 'PUT' : 'POST';
+
+    fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Role: getRoleHeader()
+      },
+      body: JSON.stringify(tourData)
+    })
+    .then(res => {
+      if (!res.ok) throw new Error(`Ошибка сохранения: ${res.status}`);
+      return res.json();
+    })
+    .then(savedTour => {
+      if (editingTourId) {
+        setTours(tours.map(t => t.id === editingTourId ? savedTour : t));
+        setFavorites(favorites.map(t => t.id === editingTourId ? savedTour : t));
+        setCart(cart.map(t => t.id === editingTourId ? savedTour : t));
+        setAdminMessage('Тур обновлён');
+      } else {
+        setTours([...tours, savedTour]);
+        setAdminMessage('Тур добавлен');
+      }
+      setTourForm(emptyTourForm);
+      setEditingTourId(null);
+    })
+    .catch(err => setAdminMessage(err.message));
   };
 
   const handleAuth = (e) => {
@@ -156,6 +225,9 @@ function App() {
         <nav className="nav-menu">  
           <span className={`nav-link ${view === 'catalog' ? 'active' : ''}`} onClick={() => setView('catalog')}>Каталог</span>  
           <span className={`nav-link ${view === 'favorites' ? 'active' : ''}`} onClick={() => setView('favorites')}>Избранное ({favorites.length})</span>  
+          {user?.role === 'admin' && (
+            <span className={`nav-link ${view === 'admin' ? 'active' : ''}`} onClick={() => setView('admin')}>Админ</span>
+          )}
           <span className={`nav-link ${view === 'about' ? 'active' : ''}`} onClick={() => setView('about')}>О нас</span>  
           
           {!user ? (
@@ -198,7 +270,7 @@ function App() {
           <div className="controls-section">  
             {user?.role === 'admin' && (
               <div className="admin-panel-info">
-                <button className="add-btn admin-theme" onClick={addTour}>+ Добавить новый тур</button>
+                <button className="add-btn admin-theme" onClick={() => { resetTourForm(); setView('admin'); }}>Панель администратора</button>
                 <p>Режим Администратора</p>
               </div>
             )}
@@ -223,6 +295,8 @@ function App() {
                   isAdmin={user?.role === 'admin'} 
                   isFavorite={favorites.some(f => f.id === item.id)}
                   onDelete={() => deleteTour(item.id)}
+                  onEdit={() => startEditTour(item)}
+                  getTourImage={getTourImage}
                   onAdd={() => addToCart(item)} 
                   onFavorite={() => toggleFavorite(item)}
                 />  
@@ -243,6 +317,7 @@ function App() {
                   item={item} 
                   isAdmin={false}
                   isFavorite={true}
+                  getTourImage={getTourImage}
                   onAdd={() => addToCart(item)}
                   onFavorite={() => toggleFavorite(item)}
                 />
@@ -251,6 +326,66 @@ function App() {
               <div className="empty-state"><p>В избранном пока ничего нет</p></div>
             )}
           </main>
+        </div>
+      )}
+
+      {view === 'admin' && user?.role === 'admin' && (
+        <div className="page-content admin-page">
+          <div className="admin-header">
+            <h2 className="page-title">Панель администратора</h2>
+            <button className="admin-secondary-btn" onClick={resetTourForm}>Новый тур</button>
+          </div>
+
+          <div className="admin-layout">
+            <form className="admin-form" onSubmit={saveTour}>
+              <h3>{editingTourId ? 'Редактирование тура' : 'Добавление тура'}</h3>
+              <div className="input-group">
+                <label>Название</label>
+                <input name="title" type="text" value={tourForm.title} onChange={handleTourFormChange} />
+              </div>
+              <div className="input-group">
+                <label>Цена</label>
+                <input name="price" type="number" min="1" value={tourForm.price} onChange={handleTourFormChange} />
+              </div>
+              <div className="input-group">
+                <label>Категория</label>
+                <input name="category" type="text" value={tourForm.category} onChange={handleTourFormChange} />
+              </div>
+              <div className="input-group">
+                <label>Ссылка на изображение</label>
+                <input name="img" type="text" value={tourForm.img} onChange={handleTourFormChange} placeholder="Можно оставить пустым" />
+              </div>
+              <p className="admin-form-hint">Если поле пустое, изображение подберётся автоматически по категории.</p>
+              {adminMessage && <p className="admin-message">{adminMessage}</p>}
+              <div className="admin-form-actions">
+                <button type="submit" className="login-submit-btn">{editingTourId ? 'Сохранить' : 'Добавить'}</button>
+                {editingTourId && <button type="button" className="admin-secondary-btn" onClick={resetTourForm}>Отмена</button>}
+              </div>
+            </form>
+
+            <div className="admin-table">
+              <div className="admin-table-head">
+                <span>Тур</span>
+                <span>Категория</span>
+                <span>Цена</span>
+                <span></span>
+              </div>
+              {tours.map(tour => (
+                <div className="admin-table-row" key={tour.id}>
+                  <div className="admin-tour-cell">
+                    <img src={getTourImage(tour)} alt={tour.title} />
+                    <strong>{tour.title}</strong>
+                  </div>
+                  <span>{tour.category}</span>
+                  <span>${tour.price}</span>
+                  <div className="admin-row-actions">
+                    <button onClick={() => startEditTour(tour)}>Редактировать</button>
+                    <button className="danger-action" onClick={() => deleteTour(tour.id)}>Удалить</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -266,7 +401,7 @@ function App() {
                   </div>
                   {cart.map((item, i) => (
                     <div key={i} className="cart-item-card">
-                      <img src={item.img} alt={item.title} className="cart-item-img" />
+                      <img src={getTourImage(item)} alt={item.title} className="cart-item-img" />
                       <div className="cart-item-info">
                         <h4>{item.title}</h4>
                         <p>{item.category}</p>
@@ -321,11 +456,11 @@ function App() {
   );  
 }  
 
-function TourCard({ item, onAdd, isAdmin, onDelete, isFavorite, onFavorite }) {  
+function TourCard({ item, onAdd, isAdmin, onDelete, onEdit, isFavorite, onFavorite, getTourImage }) {  
   return (  
     <div className="modern-card">  
       <div className="card-image-h">
-        <img src={item.img} alt="" />
+        <img src={getTourImage ? getTourImage(item) : item.img} alt="" />
         <button className={`fav-btn-overlay ${isFavorite ? 'active' : ''}`} onClick={onFavorite}>
           {isFavorite ? '❤️' : '🤍'}
         </button>
@@ -336,6 +471,7 @@ function TourCard({ item, onAdd, isAdmin, onDelete, isFavorite, onFavorite }) {
           <span className="price">${item.price}</span>  
           <div className="card-buttons">
             <button className="add-btn" onClick={onAdd}>В корзину</button>
+            {isAdmin && <button className="edit-btn-admin" onClick={onEdit}>✎</button>}
             {isAdmin && <button className="delete-btn-admin" onClick={onDelete}>🗑️</button>}
           </div>
         </div>  
