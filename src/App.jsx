@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';  
 
 const API_URL = 'http://localhost:5001/api/tours';
+const USER_STORAGE_KEY = 'travelLuxeUser';
 const emptyTourForm = { title: '', price: '', category: '', img: '' };
 const fallbackImages = {
   beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900',
@@ -23,7 +24,10 @@ function App() {
   const [search, setSearch] = useState('');  
   const [category, setCategory] = useState('Все');  
 
-  const [user, setUser] = useState(null); 
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem(USER_STORAGE_KEY);
+    return savedUser ? JSON.parse(savedUser) : null;
+  }); 
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -201,10 +205,14 @@ function App() {
     e.preventDefault();
     setAuthError('');
     if (loginInput === 'admin' && passwordInput === '1234') {
-      setUser({ name: 'Администратор', role: 'admin' });
+      const adminUser = { name: 'Администратор', role: 'admin' };
+      setUser(adminUser);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(adminUser));
       setView('catalog');
     } else if (loginInput === 'user' && passwordInput === '1111') {
-      setUser({ name: 'Алексей', role: 'user' });
+      const regularUser = { name: 'Алексей', role: 'user' };
+      setUser(regularUser);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(regularUser));
       setView('catalog');
     } else {
       setAuthError('Неверный логин или пароль!');
@@ -233,7 +241,7 @@ function App() {
           {!user ? (
             <span className={`nav-link ${view === 'auth' ? 'active' : ''}`} onClick={() => setView('auth')}>Войти</span>
           ) : (
-            <span className="user-badge" onClick={() => {setUser(null); setView('catalog');}}>
+            <span className="user-badge" onClick={() => { localStorage.removeItem(USER_STORAGE_KEY); setUser(null); setView('catalog'); }}>
               Выйти ({user.role === 'admin' ? 'Админ' : user.name})
             </span>
           )}
