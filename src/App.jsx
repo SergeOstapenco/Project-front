@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';  
 import './App.css';  
 
-const API_URL = 'http://localhost:5001/api/tours';
+const API_URL = 'http://localhost:5000/api/tours';
+const AUTH_API_URL = 'http://localhost:5000/api/auth';
+const TOKEN_STORAGE_KEY = 'travelLuxeToken';
 const USER_STORAGE_KEY = 'travelLuxeUser';
 const ACCOUNT_DATA_PREFIX = 'travelLuxeAccountData';
 const emptyTourForm = { title: '', price: '', category: '', img: '' };
@@ -13,8 +15,8 @@ const fallbackImages = {
   default: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=900'
 };
 
-const getAccountDataKey = (account) => {
-  return `${ACCOUNT_DATA_PREFIX}:${account.role}`;
+const getAccountDataKey = (userId) => {
+  return `${ACCOUNT_DATA_PREFIX}:${userId}`;
 };
 
 const getSavedUser = () => {
@@ -22,15 +24,19 @@ const getSavedUser = () => {
   return savedUser ? JSON.parse(savedUser) : null;
 };
 
-const getSavedAccountData = (account) => {
-  if (!account) return { favorites: [], cart: [] };
+const getSavedToken = () => {
+  return localStorage.getItem(TOKEN_STORAGE_KEY);
+};
 
-  const savedData = localStorage.getItem(getAccountDataKey(account));
+const getSavedAccountData = (userId) => {
+  if (!userId) return { favorites: [], cart: [] };
+  const savedData = localStorage.getItem(getAccountDataKey(userId));
   return savedData ? JSON.parse(savedData) : { favorites: [], cart: [] };
 };
 
 const initialUser = getSavedUser();
-const initialAccountData = getSavedAccountData(initialUser);
+const initialToken = getSavedToken();
+const initialAccountData = getSavedAccountData(initialUser?.id);
 
 function App() {  
   const [view, setView] = useState('catalog');  
@@ -44,20 +50,24 @@ function App() {
   const [search, setSearch] = useState('');  
   const [category, setCategory] = useState('Все');  
 
-  const [user, setUser] = useState(initialUser); 
-  const [loginInput, setLoginInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
+  const [user, setUser] = useState(initialUser);
+  const [token, setToken] = useState(initialToken);
+  const [isLoginMode, setIsLoginMode] = useState(true); // true for login, false for register
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   const [tourForm, setTourForm] = useState(emptyTourForm);
   const [editingTourId, setEditingTourId] = useState(null);
   const [adminMessage, setAdminMessage] = useState('');
 
   const categories = ['Все', 'Пляж', 'Горы', 'Город', 'Природа'];  
 
-  const getRoleHeader = () => {
-    if (user?.role === 'admin') return 'Admin';
-    if (user?.role === 'user') return 'User';
-    return '';
+  const getAuthHeader = () => {
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
   };
 
   const getImageForCategory = (value) => {
@@ -98,7 +108,7 @@ function App() {
   useEffect(() => {
     if (!user) return;
 
-    localStorage.setItem(getAccountDataKey(user), JSON.stringify({
+    localStorage.setItem(getAccountDataKey(user.id), JSON.stringify({
       favorites,
       cart
     }));
@@ -151,7 +161,7 @@ function App() {
     if (window.confirm("Вы уверены, что хотите удалить этот тур?")) {
       fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
-        headers: { Role: getRoleHeader() }
+        headers: getAuthHeader()
       })
       .then(res => {
         if (res.ok) {
@@ -211,7 +221,7 @@ function App() {
       method,
       headers: {
         'Content-Type': 'application/json',
-        Role: getRoleHeader()
+        ...getAuthHeader()
       },
       body: JSON.stringify(tourData)
     })
@@ -235,30 +245,101 @@ function App() {
     .catch(err => setAdminMessage(err.message));
   };
 
-  const handleAuth = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
-    if (loginInput === 'admin' && passwordInput === '1234') {
-      const adminUser = { name: 'Администратор', role: 'admin' };
-      const savedData = getSavedAccountData(adminUser);
-      setUser(adminUser);
-      setFavorites(savedData.favorites);
-      setCart(savedData.cart);
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(adminUser));
+    setAuthLoading(true);
+
+    try {
+      const response = await fetch(`${AUTH_API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setAuthError(data.message || 'Ошибка при входе');
+        setAuthLoading(false);
+        return;
+      }
+
+      // Save token and user data
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+
+      setToken(data.token);
+      setUser(data.user);
+      
+      // Load account data for this user
+      const accountData = getSavedAccountData(data.user.id);
+      setFavorites(accountData.favorites);
+      setCart(accountData.cart);
+
+      setUsername('');
+      setPassword('');
       setView('catalog');
-    } else if (loginInput === 'user' && passwordInput === '1111') {
-      const regularUser = { name: 'Алексей', role: 'user' };
-      const savedData = getSavedAccountData(regularUser);
-      setUser(regularUser);
-      setFavorites(savedData.favorites);
-      setCart(savedData.cart);
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(regularUser));
-      setView('catalog');
-    } else {
-      setAuthError('Неверный логин или пароль!');
+    } catch (err) {
+      setAuthError('Ошибка подключения к серверу');
+    } finally {
+      setAuthLoading(false);
     }
-    setLoginInput('');
-    setPasswordInput('');
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    if (password !== confirmPassword) {
+      setAuthError('Пароли не совпадают');
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${AUTH_API_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setAuthError(data.message || 'Ошибка при регистрации');
+        setAuthLoading(false);
+        return;
+      }
+
+      // Save token and user data
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+
+      setToken(data.token);
+      setUser(data.user);
+
+      setUsername('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setView('catalog');
+    } catch (err) {
+      setAuthError('Ошибка подключения к серверу');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setToken(null);
+    setUser(null);
+    setFavorites([]);
+    setCart([]);
+    setView('catalog');
   };
 
   const filtered = tours.filter(item =>  
@@ -281,8 +362,8 @@ function App() {
           {!user ? (
             <span className={`nav-link ${view === 'auth' ? 'active' : ''}`} onClick={() => setView('auth')}>Войти</span>
           ) : (
-            <span className="user-badge" onClick={logout}>
-              Выйти ({user.role === 'admin' ? 'Админ' : user.name})
+            <span className="user-badge" onClick={handleLogout}>
+              Выйти ({user.role === 'admin' ? 'Админ' : user.username})
             </span>
           )}
           <button className="cart-btn-main" onClick={() => handleActionWithAuth(() => setView('cart'))}>🛒 ({user ? cart.length : 0})</button>  
@@ -292,18 +373,75 @@ function App() {
       {view === 'auth' && (
         <div className="page-content auth-page">
           <div className="auth-box large-box">
-            <h2 className="page-title">Вход</h2>
-            <form onSubmit={handleAuth} className="auth-form">
+            <h2 className="page-title">{isLoginMode ? 'Вход' : 'Регистрация'}</h2>
+            <form onSubmit={isLoginMode ? handleLogin : handleRegister} className="auth-form">
               <div className="input-group">
-                <label>Логин</label>
-                <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} required />
+                <label>Имя пользователя</label>
+                <input 
+                  type="text" 
+                  value={username} 
+                  onChange={(e) => setUsername(e.target.value)} 
+                  required 
+                  disabled={authLoading}
+                />
               </div>
+              {!isLoginMode && (
+                <div className="input-group">
+                  <label>Email</label>
+                  <input 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    required 
+                    disabled={authLoading}
+                  />
+                </div>
+              )}
               <div className="input-group">
                 <label>Пароль</label>
-                <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} required />
+                <input 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  required 
+                  disabled={authLoading}
+                />
               </div>
+              {!isLoginMode && (
+                <div className="input-group">
+                  <label>Повторите пароль</label>
+                  <input 
+                    type="password" 
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)} 
+                    required 
+                    disabled={authLoading}
+                  />
+                </div>
+              )}
               {authError && <p className="auth-error-msg">{authError}</p>}
-              <button type="submit" className="login-submit-btn">Войти</button>
+              <button type="submit" className="login-submit-btn" disabled={authLoading}>
+                {authLoading ? 'Загрузка...' : (isLoginMode ? 'Войти' : 'Зарегистрироваться')}
+              </button>
+              <div className="auth-toggle">
+                <p>
+                  {isLoginMode ? 'Нет аккаунта? ' : 'Уже есть аккаунт? '}
+                  <button 
+                    type="button" 
+                    className="auth-toggle-btn"
+                    onClick={() => {
+                      setIsLoginMode(!isLoginMode);
+                      setAuthError('');
+                      setUsername('');
+                      setEmail('');
+                      setPassword('');
+                      setConfirmPassword('');
+                    }}
+                  >
+                    {isLoginMode ? 'Зарегистрируйтесь' : 'Войдите'}
+                  </button>
+                </p>
+              </div>
             </form>
           </div>
         </div>

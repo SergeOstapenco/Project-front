@@ -186,7 +186,11 @@ body, html, #root {
 .input-group label { font-weight: 700; color: var(--text-light); }
 .input-group input { padding: 16px; border-radius: 14px; border: 1.5px solid #e2e8f0; outline: none; font-size: 1rem; }
 .login-submit-btn { background: var(--primary); color: white; border: none; padding: 18px; border-radius: 14px; font-weight: 700; cursor: pointer; font-size: 1.1rem; }
+.login-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .auth-error-msg { color: var(--danger); font-weight: 700; text-align: center; }
+.auth-toggle { text-align: center; margin-top: 15px; }
+.auth-toggle p { font-size: 0.95rem; color: var(--text-light); }
+.auth-toggle-btn { background: none; border: none; color: var(--primary); font-weight: 700; cursor: pointer; text-decoration: underline; padding: 0; }
 
 .admin-page { text-align: left; }
 .admin-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 30px; }
