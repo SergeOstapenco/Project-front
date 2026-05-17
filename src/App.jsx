@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';  
 import './App.css';  
+import logo from './assets/traveluxe-logo.png';
 
 const API_URL = 'http://localhost:5000/api/tours';
 const AUTH_API_URL = 'http://localhost:5000/api/auth';
@@ -265,14 +266,12 @@ function App() {
         return;
       }
 
-      // Save token and user data
       localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
 
       setToken(data.token);
       setUser(data.user);
       
-      // Load account data for this user
       const accountData = getSavedAccountData(data.user.id);
       setFavorites(accountData.favorites);
       setCart(accountData.cart);
@@ -350,7 +349,9 @@ function App() {
   return (  
     <div className="app-container">  
       <header className="header">  
-        <div className="logo" onClick={() => setView('catalog')}>TRAVEL<span>Luxe</span></div>  
+<div className="logo" onClick={() => setView('catalog')}>
+  <img src={logo} alt="TRAVELuxe" className="logo-img" />
+</div> 
         <nav className="nav-menu">  
           <span className={`nav-link ${view === 'catalog' ? 'active' : ''}`} onClick={() => setView('catalog')}>Каталог</span>  
           <span className={`nav-link ${view === 'favorites' ? 'active' : ''}`} onClick={() => handleActionWithAuth(() => setView('favorites'))}>Избранное ({user ? favorites.length : 0})</span>  
