@@ -152,6 +152,7 @@ body, html, #root {
   box-shadow: var(--shadow);
   transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
+  cursor: pointer;
 }
 
 .modern-card:hover { transform: translateY(-12px); box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
@@ -173,6 +174,17 @@ body, html, #root {
 
 .card-content { padding: 25px; }
 .card-content h3 { font-family: 'Montserrat'; font-size: 1.4rem; margin-bottom: 15px; }
+.card-description {
+  color: var(--text-light);
+  font-weight: 600;
+  line-height: 1.45;
+  min-height: 44px;
+  margin-bottom: 18px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .card-footer-row { display: flex; justify-content: space-between; align-items: center; }
 .price { font-size: 1.7rem; font-weight: 900; color: var(--primary); }
 
@@ -194,6 +206,16 @@ body, html, #root {
 .input-group { display: flex; flex-direction: column; gap: 8px; }
 .input-group label { font-weight: 700; color: var(--text-light); }
 .input-group input { padding: 16px; border-radius: 14px; border: 1.5px solid #e2e8f0; outline: none; font-size: 1rem; }
+.input-group textarea {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  outline: none;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 118px;
+}
 .login-submit-btn { background: var(--primary); color: white; border: none; padding: 18px; border-radius: 14px; font-weight: 700; cursor: pointer; font-size: 1.1rem; }
 .login-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .auth-error-msg { color: var(--danger); font-weight: 700; text-align: center; }
@@ -289,10 +311,146 @@ body, html, #root {
 .page-title { font-family: 'Montserrat'; font-size: 2.5rem; margin-bottom: 40px; text-align: center; }
 .state-msg { text-align: center; padding: 100px; font-size: 1.2rem; font-weight: 700; color: var(--text-light); }
 
+.tour-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+
+.tour-modal {
+  width: min(960px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  background: white;
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+  position: relative;
+}
+
+.tour-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+}
+
+.tour-gallery {
+  width: 100%;
+  height: 430px;
+  position: relative;
+  background: #e2e8f0;
+}
+
+.tour-gallery img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+.gallery-prev { left: 20px; }
+.gallery-next { right: 20px; }
+
+.gallery-counter {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.78);
+  color: white;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 800;
+}
+
+.tour-detail-content { padding: 34px; }
+.tour-detail-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+.tour-category {
+  display: inline-flex;
+  color: var(--primary-dark);
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+.tour-detail-heading h2 {
+  font-family: 'Montserrat';
+  font-size: 2rem;
+}
+.tour-detail-price {
+  color: var(--primary);
+  font-size: 2.2rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.tour-detail-description {
+  color: var(--text-light);
+  font-size: 1.08rem;
+  line-height: 1.7;
+  margin: 24px 0 30px;
+  white-space: pre-line;
+}
+.tour-detail-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.favorite-detail-btn {
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  color: var(--text);
+  padding: 12px 22px;
+  border-radius: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.favorite-detail-btn.active {
+  color: var(--danger);
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
 @media (max-width: 900px) {
   .admin-layout { grid-template-columns: 1fr; }
   .admin-form { position: static; }
   .admin-table-head { display: none; }
   .admin-table-row { grid-template-columns: 1fr; }
   .admin-row-actions { justify-content: flex-start; }
+  .tour-modal-backdrop { padding: 14px; align-items: flex-start; }
+  .tour-gallery { height: 280px; }
+  .tour-detail-heading { flex-direction: column; }
+  .tour-detail-price { font-size: 1.8rem; }
+  .tour-detail-content { padding: 24px; }
 }

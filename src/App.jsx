@@ -7,7 +7,7 @@ const AUTH_API_URL = 'http://localhost:5000/api/auth';
 const TOKEN_STORAGE_KEY = 'travelLuxeToken';
 const USER_STORAGE_KEY = 'travelLuxeUser';
 const ACCOUNT_DATA_PREFIX = 'travelLuxeAccountData';
-const emptyTourForm = { title: '', price: '', category: '', img: '' };
+const emptyTourForm = { title: '', price: '', category: '', img: '', description: '', images: '' };
 const fallbackImages = {
   beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900',
   mountains: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900',
@@ -55,6 +55,24 @@ const initialToken = getSavedToken();
 const initialUser = initialToken ? getSavedUser() : null;
 const initialAccountData = getSavedAccountData(initialUser?.id);
 
+const parseTourImages = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String).map(item => item.trim()).filter(Boolean);
+  } catch {
+    return String(value).split('\n').map(item => item.trim()).filter(Boolean);
+  }
+
+  return [];
+};
+
+const serializeTourImages = (value) => {
+  return JSON.stringify(parseTourImages(value));
+};
+
 function App() {  
   const [view, setView] = useState('catalog');  
   const [tours, setTours] = useState([]);  
@@ -79,6 +97,8 @@ function App() {
   const [tourForm, setTourForm] = useState(emptyTourForm);
   const [editingTourId, setEditingTourId] = useState(null);
   const [adminMessage, setAdminMessage] = useState('');
+  const [selectedTour, setSelectedTour] = useState(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   const categories = ['Все', 'Пляж', 'Горы', 'Город', 'Природа'];  
 
@@ -96,8 +116,14 @@ function App() {
     return fallbackImages.default;
   };
 
+  const getTourImages = (tour) => {
+    const mainImage = tour.img || getImageForCategory(tour.category || tour.title || '');
+    const galleryImages = parseTourImages(tour.images);
+    return [mainImage, ...galleryImages.filter(image => image && image !== mainImage)];
+  };
+
   const getTourImage = (tour) => {
-    return tour.img || getImageForCategory(tour.category || tour.title || '');
+    return getTourImages(tour)[0];
   };
 
   const fetchTours = () => {
@@ -175,6 +201,15 @@ function App() {
     alert('Сессия истекла. Войдите снова.');
   };
 
+  const handleAdminAccessDenied = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setToken(null);
+    setUser(null);
+    setView('auth');
+    alert('Нет доступа администратора. Войдите в аккаунт админа заново.');
+  };
+
   const logout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(USER_STORAGE_KEY);
@@ -196,9 +231,12 @@ function App() {
           setTours(tours.filter(t => t.id !== id));
           setFavorites(favorites.filter(t => t.id !== id));
           setCart(cart.filter(t => t.id !== id));
+          if (selectedTour?.id === id) closeTour();
           setAdminMessage('Тур удалён');
         } else if (res.status === 401) {
           handleAuthExpired();
+        } else if (res.status === 403) {
+          handleAdminAccessDenied();
         } else {
           alert(`Ошибка при удалении: ${res.status}`);
         }
@@ -218,12 +256,24 @@ function App() {
     setTourForm({ ...tourForm, [name]: value });
   };
 
+  const openTour = (tour) => {
+    setSelectedTour(tour);
+    setGalleryIndex(0);
+  };
+
+  const closeTour = () => {
+    setSelectedTour(null);
+    setGalleryIndex(0);
+  };
+
   const startEditTour = (tour) => {
     setTourForm({
       title: tour.title,
       price: String(tour.price),
       category: tour.category,
-      img: tour.img
+      img: tour.img,
+      description: tour.description || '',
+      images: parseTourImages(tour.images).join('\n')
     });
     setEditingTourId(tour.id);
     setAdminMessage('');
@@ -236,7 +286,9 @@ function App() {
       title: tourForm.title.trim(),
       price: Number(tourForm.price),
       category: tourForm.category.trim(),
-      img: tourForm.img.trim() || getImageForCategory(tourForm.category || tourForm.title)
+      img: tourForm.img.trim() || getImageForCategory(tourForm.category || tourForm.title),
+      description: tourForm.description.trim(),
+      images: serializeTourImages(tourForm.images)
     };
 
     if (!tourData.title || !tourData.price || !tourData.category) {
@@ -260,6 +312,10 @@ function App() {
         handleAuthExpired();
         throw new Error('Сессия истекла');
       }
+      if (res.status === 403) {
+        handleAdminAccessDenied();
+        throw new Error('Нет доступа администратора');
+      }
       if (!res.ok) throw new Error(`Ошибка сохранения: ${res.status}`);
       return res.json();
     })
@@ -268,6 +324,10 @@ function App() {
         setTours(tours.map(t => t.id === editingTourId ? savedTour : t));
         setFavorites(favorites.map(t => t.id === editingTourId ? savedTour : t));
         setCart(cart.map(t => t.id === editingTourId ? savedTour : t));
+        if (selectedTour?.id === editingTourId) {
+          setSelectedTour(savedTour);
+          setGalleryIndex(0);
+        }
         setAdminMessage('Тур обновлён');
       } else {
         setTours([...tours, savedTour]);
@@ -275,6 +335,7 @@ function App() {
       }
       setTourForm(emptyTourForm);
       setEditingTourId(null);
+      fetchTours();
     })
     .catch(err => setAdminMessage(err.message));
   };
@@ -516,6 +577,7 @@ function App() {
                   isFavorite={favorites.some(f => f.id === item.id)}
                   onDelete={() => deleteTour(item.id)}
                   onEdit={() => startEditTour(item)}
+                  onOpen={() => openTour(item)}
                   getTourImage={getTourImage}
                   onAdd={() => addToCart(item)} 
                   onFavorite={() => toggleFavorite(item)}
@@ -538,6 +600,7 @@ function App() {
                   isAdmin={false}
                   isFavorite={true}
                   getTourImage={getTourImage}
+                  onOpen={() => openTour(item)}
                   onAdd={() => addToCart(item)}
                   onFavorite={() => toggleFavorite(item)}
                 />
@@ -575,7 +638,15 @@ function App() {
                 <label>Ссылка на изображение</label>
                 <input name="img" type="text" value={tourForm.img} onChange={handleTourFormChange} placeholder="Можно оставить пустым" />
               </div>
-              <p className="admin-form-hint">Если поле пустое, изображение подберётся автоматически по категории.</p>
+              <div className="input-group">
+                <label>Описание</label>
+                <textarea name="description" value={tourForm.description} onChange={handleTourFormChange} rows="5" placeholder="Что входит в тур, куда едем, чем он интересен" />
+              </div>
+              <div className="input-group">
+                <label>Дополнительные фотографии</label>
+                <textarea name="images" value={tourForm.images} onChange={handleTourFormChange} rows="5" placeholder="Каждая ссылка с новой строки" />
+              </div>
+              <p className="admin-form-hint">Главное изображение можно оставить пустым. Дополнительные фото вставляйте прямыми ссылками на изображения.</p>
               {adminMessage && <p className="admin-message">{adminMessage}</p>}
               <div className="admin-form-actions">
                 <button type="submit" className="login-submit-btn">{editingTourId ? 'Сохранить' : 'Добавить'}</button>
@@ -634,7 +705,7 @@ function App() {
                 <div className="cart-summary-panel">
                   <h3>Итог заказа</h3>
                   <div className="summary-row"><span>Туров:</span><span>{cart.length}</span></div>
-                  <div className="summary-total"><span>К оплате:</span><span>${cart.reduce((s, i) => s + i.price, 0)}</span></div>
+                  <div className="summary-total"><span>К оплате:</span><span>${cart.reduce((s, i) => s + Number(i.price), 0)}</span></div>
                   <button className="checkout-btn">Оформить заказ</button>
                 </div>
               </div>
@@ -672,32 +743,103 @@ function App() {
           </div>
         </div>  
       )}
+
+      {selectedTour && (
+        <TourDetailsModal
+          tour={selectedTour}
+          images={getTourImages(selectedTour)}
+          galleryIndex={galleryIndex}
+          setGalleryIndex={setGalleryIndex}
+          onClose={closeTour}
+          onAdd={() => addToCart(selectedTour)}
+          isFavorite={favorites.some(f => f.id === selectedTour.id)}
+          onFavorite={() => toggleFavorite(selectedTour)}
+        />
+      )}
     </div>  
   );  
 }  
 
-function TourCard({ item, onAdd, isAdmin, onDelete, onEdit, isFavorite, onFavorite, getTourImage }) {  
+function TourCard({ item, onAdd, isAdmin, onDelete, onEdit, isFavorite, onFavorite, getTourImage, onOpen }) {  
+  const handleButtonClick = (e, action) => {
+    e.stopPropagation();
+    action();
+  };
+
   return (  
-    <div className="modern-card">  
+    <div className="modern-card" onClick={onOpen}>  
       <div className="card-image-h">
-        <img src={getTourImage ? getTourImage(item) : item.img} alt="" />
-        <button className={`fav-btn-overlay ${isFavorite ? 'active' : ''}`} onClick={onFavorite}>
+        <img src={getTourImage ? getTourImage(item) : item.img} alt={item.title} />
+        <button className={`fav-btn-overlay ${isFavorite ? 'active' : ''}`} onClick={(e) => handleButtonClick(e, onFavorite)}>
           {isFavorite ? '❤️' : '🤍'}
         </button>
       </div>  
       <div className="card-content">  
         <h3>{item.title}</h3>  
+        <p className="card-description">{item.description || 'Откройте тур, чтобы посмотреть подробности путешествия.'}</p>
         <div className="card-footer-row">  
           <span className="price">${item.price}</span>  
           <div className="card-buttons">
-            <button className="add-btn" onClick={onAdd}>В корзину</button>
-            {isAdmin && <button className="edit-btn-admin" onClick={onEdit}>✎</button>}
-            {isAdmin && <button className="delete-btn-admin" onClick={onDelete}>🗑️</button>}
+            <button className="add-btn" onClick={(e) => handleButtonClick(e, onAdd)}>В корзину</button>
+            {isAdmin && <button className="edit-btn-admin" onClick={(e) => handleButtonClick(e, onEdit)}>✎</button>}
+            {isAdmin && <button className="delete-btn-admin" onClick={(e) => handleButtonClick(e, onDelete)}>🗑️</button>}
           </div>
         </div>  
       </div>  
     </div>  
   );  
 }  
+
+function TourDetailsModal({ tour, images, galleryIndex, setGalleryIndex, onClose, onAdd, isFavorite, onFavorite }) {
+  const currentImage = images[galleryIndex] || tour.img;
+  const hasGallery = images.length > 1;
+
+  const showPreviousImage = () => {
+    setGalleryIndex((galleryIndex - 1 + images.length) % images.length);
+  };
+
+  const showNextImage = () => {
+    setGalleryIndex((galleryIndex + 1) % images.length);
+  };
+
+  return (
+    <div className="tour-modal-backdrop" onClick={onClose}>
+      <div className="tour-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="tour-modal-close" onClick={onClose}>Закрыть</button>
+        <div className="tour-gallery">
+          <img src={currentImage} alt={tour.title} />
+          {hasGallery && (
+            <>
+              <button className="gallery-btn gallery-prev" onClick={showPreviousImage}>‹</button>
+              <button className="gallery-btn gallery-next" onClick={showNextImage}>›</button>
+              <div className="gallery-counter">{galleryIndex + 1} / {images.length}</div>
+            </>
+          )}
+        </div>
+
+        <div className="tour-detail-content">
+          <div className="tour-detail-heading">
+            <div>
+              <span className="tour-category">{tour.category}</span>
+              <h2>{tour.title}</h2>
+            </div>
+            <span className="tour-detail-price">${tour.price}</span>
+          </div>
+
+          <p className="tour-detail-description">
+            {tour.description || 'Описание тура скоро появится. Администратор сможет добавить маршрут, детали проживания и особенности поездки.'}
+          </p>
+
+          <div className="tour-detail-actions">
+            <button className="add-btn" onClick={onAdd}>В корзину</button>
+            <button className={`favorite-detail-btn ${isFavorite ? 'active' : ''}`} onClick={onFavorite}>
+              {isFavorite ? 'В избранном' : 'В избранное'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default App;
