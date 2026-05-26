@@ -25,8 +25,24 @@ const getSavedUser = () => {
   return savedUser ? JSON.parse(savedUser) : null;
 };
 
+const isTokenExpired = (jwt) => {
+  try {
+    const payload = JSON.parse(atob(jwt.split('.')[1]));
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+};
+
 const getSavedToken = () => {
-  return localStorage.getItem(TOKEN_STORAGE_KEY);
+  const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!savedToken || isTokenExpired(savedToken)) {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    return null;
+  }
+
+  return savedToken;
 };
 
 const getSavedAccountData = (userId) => {
@@ -35,8 +51,8 @@ const getSavedAccountData = (userId) => {
   return savedData ? JSON.parse(savedData) : { favorites: [], cart: [] };
 };
 
-const initialUser = getSavedUser();
 const initialToken = getSavedToken();
+const initialUser = initialToken ? getSavedUser() : null;
 const initialAccountData = getSavedAccountData(initialUser?.id);
 
 function App() {  
@@ -150,8 +166,19 @@ function App() {
     if (window.confirm("Очистить корзину?")) setCart([]);
   };
 
-  const logout = () => {
+  const handleAuthExpired = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(USER_STORAGE_KEY);
+    setToken(null);
+    setUser(null);
+    setView('auth');
+    alert('Сессия истекла. Войдите снова.');
+  };
+
+  const logout = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setToken(null);
     setUser(null);
     setFavorites([]);
     setCart([]);
@@ -170,6 +197,8 @@ function App() {
           setFavorites(favorites.filter(t => t.id !== id));
           setCart(cart.filter(t => t.id !== id));
           setAdminMessage('Тур удалён');
+        } else if (res.status === 401) {
+          handleAuthExpired();
         } else {
           alert(`Ошибка при удалении: ${res.status}`);
         }
@@ -227,6 +256,10 @@ function App() {
       body: JSON.stringify(tourData)
     })
     .then(res => {
+      if (res.status === 401) {
+        handleAuthExpired();
+        throw new Error('Сессия истекла');
+      }
       if (!res.ok) throw new Error(`Ошибка сохранения: ${res.status}`);
       return res.json();
     })
