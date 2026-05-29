@@ -206,6 +206,15 @@ body, html, #root {
 .input-group { display: flex; flex-direction: column; gap: 8px; }
 .input-group label { font-weight: 700; color: var(--text-light); }
 .input-group input { padding: 16px; border-radius: 14px; border: 1.5px solid #e2e8f0; outline: none; font-size: 1rem; }
+.input-group select {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  outline: none;
+  font-size: 1rem;
+  font-family: inherit;
+  background: white;
+}
 .input-group textarea {
   padding: 16px;
   border-radius: 14px;
@@ -442,6 +451,96 @@ body, html, #root {
   border-color: #fecdd3;
 }
 
+.checkout-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+
+.checkout-modal {
+  width: min(520px, 100%);
+  background: white;
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+  padding: 42px;
+  position: relative;
+  overflow: hidden;
+}
+
+.checkout-modal h2 {
+  font-family: 'Montserrat';
+  font-size: 2rem;
+  margin-bottom: 24px;
+}
+
+.checkout-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 0;
+  margin-bottom: 24px;
+  border-top: 1.5px solid #eef2f7;
+  border-bottom: 1.5px solid #eef2f7;
+  color: var(--text-light);
+  font-weight: 800;
+}
+
+.checkout-summary strong {
+  color: var(--primary);
+  font-size: 1.8rem;
+}
+
+.checkout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.checkout-form input,
+.checkout-form select {
+  width: 100%;
+}
+
+.payment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 18px;
+  row-gap: 14px;
+}
+
+.payment-row .input-group {
+  min-width: 0;
+}
+
+.payment-note {
+  color: var(--text-light);
+  line-height: 1.5;
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.checkout-submit-btn {
+  background: var(--text);
+  color: white;
+  border: none;
+  padding: 18px;
+  border-radius: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  font-size: 1.05rem;
+}
+
+.checkout-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
   .admin-layout { grid-template-columns: 1fr; }
   .admin-form { position: static; }
@@ -453,4 +552,6 @@ body, html, #root {
   .tour-detail-heading { flex-direction: column; }
   .tour-detail-price { font-size: 1.8rem; }
   .tour-detail-content { padding: 24px; }
+  .checkout-modal { padding: 28px; }
+  .payment-row { grid-template-columns: 1fr; }
 }

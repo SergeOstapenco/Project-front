@@ -4,10 +4,18 @@ import logo from './assets/traveluxe-logo.png';
 
 const API_URL = 'http://localhost:5000/api/tours';
 const AUTH_API_URL = 'http://localhost:5000/api/auth';
+const CHECKOUT_API_URL = 'http://localhost:5000/api/orders/checkout';
 const TOKEN_STORAGE_KEY = 'travelLuxeToken';
 const USER_STORAGE_KEY = 'travelLuxeUser';
 const ACCOUNT_DATA_PREFIX = 'travelLuxeAccountData';
 const emptyTourForm = { title: '', price: '', category: '', img: '', description: '', images: '' };
+const emptyPaymentForm = {
+  paymentMethod: 'card',
+  cardholderName: '',
+  cardNumber: '',
+  expirationDate: '',
+  cvv: ''
+};
 const fallbackImages = {
   beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900',
   mountains: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900',
@@ -99,8 +107,13 @@ function App() {
   const [adminMessage, setAdminMessage] = useState('');
   const [selectedTour, setSelectedTour] = useState(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
 
   const categories = ['Все', 'Пляж', 'Горы', 'Город', 'Природа'];  
+  const cartTotal = cart.reduce((sum, item) => sum + Number(item.price), 0);
 
   const getAuthHeader = () => {
     if (!token) return {};
@@ -190,6 +203,71 @@ function App() {
 
   const clearCart = () => {
     if (window.confirm("Очистить корзину?")) setCart([]);
+  };
+
+  const openCheckout = () => {
+    if (cart.length === 0) return;
+    setCheckoutError('');
+    setPaymentForm(emptyPaymentForm);
+    setIsCheckoutOpen(true);
+  };
+
+  const closeCheckout = () => {
+    if (checkoutLoading) return;
+    setIsCheckoutOpen(false);
+    setCheckoutError('');
+  };
+
+  const handlePaymentFormChange = (e) => {
+    const { name, value } = e.target;
+    setPaymentForm({ ...paymentForm, [name]: value });
+  };
+
+  const submitCheckout = async (e) => {
+    e.preventDefault();
+    setCheckoutError('');
+    setCheckoutLoading(true);
+
+    try {
+      const response = await fetch(CHECKOUT_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        },
+        body: JSON.stringify({
+          tourIds: cart.map(item => item.id),
+          ...paymentForm
+        })
+      });
+
+      if (response.status === 401) {
+        handleAuthExpired();
+        return;
+      }
+
+      if (response.status === 403) {
+        setCheckoutError('Для оформления заказа нужно войти как пользователь.');
+        return;
+      }
+
+      const responseText = await response.text();
+      const data = responseText ? JSON.parse(responseText) : {};
+
+      if (!response.ok) {
+        setCheckoutError(data.message || `Ошибка оплаты: ${response.status}`);
+        return;
+      }
+
+      setCart([]);
+      setIsCheckoutOpen(false);
+      setPaymentForm(emptyPaymentForm);
+      alert(`Заказ #${data.orderId} успешно оплачен`);
+    } catch (err) {
+      setCheckoutError(err instanceof SyntaxError ? 'Сервер вернул неверный ответ' : 'Сервер C# не отвечает');
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const handleAuthExpired = () => {
@@ -705,8 +783,8 @@ function App() {
                 <div className="cart-summary-panel">
                   <h3>Итог заказа</h3>
                   <div className="summary-row"><span>Туров:</span><span>{cart.length}</span></div>
-                  <div className="summary-total"><span>К оплате:</span><span>${cart.reduce((s, i) => s + Number(i.price), 0)}</span></div>
-                  <button className="checkout-btn">Оформить заказ</button>
+                  <div className="summary-total"><span>К оплате:</span><span>${cartTotal}</span></div>
+                  <button className="checkout-btn" onClick={openCheckout}>Оформить заказ</button>
                 </div>
               </div>
             ) : (
@@ -754,6 +832,19 @@ function App() {
           onAdd={() => addToCart(selectedTour)}
           isFavorite={favorites.some(f => f.id === selectedTour.id)}
           onFavorite={() => toggleFavorite(selectedTour)}
+        />
+      )}
+
+      {isCheckoutOpen && (
+        <CheckoutModal
+          cart={cart}
+          total={cartTotal}
+          paymentForm={paymentForm}
+          checkoutLoading={checkoutLoading}
+          checkoutError={checkoutError}
+          onChange={handlePaymentFormChange}
+          onClose={closeCheckout}
+          onSubmit={submitCheckout}
         />
       )}
     </div>  
@@ -837,6 +928,70 @@ function TourDetailsModal({ tour, images, galleryIndex, setGalleryIndex, onClose
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CheckoutModal({ cart, total, paymentForm, checkoutLoading, checkoutError, onChange, onClose, onSubmit }) {
+  const isCardPayment = paymentForm.paymentMethod === 'card';
+
+  return (
+    <div className="checkout-backdrop" onClick={onClose}>
+      <div className="checkout-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="tour-modal-close" onClick={onClose}>Закрыть</button>
+        <h2>Оплата заказа</h2>
+
+        <div className="checkout-summary">
+          <span>Туров: {cart.length}</span>
+          <strong>${total}</strong>
+        </div>
+
+        <form className="checkout-form" onSubmit={onSubmit}>
+          <div className="input-group">
+            <label>Способ оплаты</label>
+            <select name="paymentMethod" value={paymentForm.paymentMethod} onChange={onChange}>
+              <option value="card">Банковская карта</option>
+              <option value="paypal">PayPal</option>
+              <option value="cash">Наличные в офисе</option>
+            </select>
+          </div>
+
+          {isCardPayment && (
+            <>
+              <div className="input-group">
+                <label>Имя владельца карты</label>
+                <input name="cardholderName" type="text" value={paymentForm.cardholderName} onChange={onChange} required />
+              </div>
+              <div className="input-group">
+                <label>Номер карты</label>
+                <input name="cardNumber" type="text" inputMode="numeric" value={paymentForm.cardNumber} onChange={onChange} placeholder="4111 1111 1111 1111" required />
+              </div>
+              <div className="payment-row">
+                <div className="input-group">
+                  <label>Срок</label>
+                  <input name="expirationDate" type="text" value={paymentForm.expirationDate} onChange={onChange} placeholder="12/28" required />
+                </div>
+                <div className="input-group">
+                  <label>CVV</label>
+                  <input name="cvv" type="password" inputMode="numeric" value={paymentForm.cvv} onChange={onChange} required />
+                </div>
+              </div>
+            </>
+          )}
+
+          {!isCardPayment && (
+            <p className="payment-note">
+              Это учебная имитация оплаты. После подтверждения заказ будет сохранён со статусом оплаты.
+            </p>
+          )}
+
+          {checkoutError && <p className="auth-error-msg">{checkoutError}</p>}
+
+          <button type="submit" className="checkout-submit-btn" disabled={checkoutLoading}>
+            {checkoutLoading ? 'Оплата...' : 'Оплатить'}
+          </button>
+        </form>
       </div>
     </div>
   );
