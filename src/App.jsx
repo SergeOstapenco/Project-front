@@ -81,6 +81,32 @@ const serializeTourImages = (value) => {
   return JSON.stringify(parseTourImages(value));
 };
 
+const formatCardNumber = (value) => {
+  return value
+    .replace(/\D/g, '')
+    .slice(0, 16)
+    .replace(/(\d{4})(?=\d)/g, '$1 ');
+};
+
+const formatExpirationDate = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+
+  if (digits.length === 0) return '';
+  if (digits.length === 1) {
+    return Number(digits) > 1 ? `0${digits}/` : digits;
+  }
+
+  const monthNumber = Math.min(Math.max(Number(digits.slice(0, 2)), 1), 12);
+  const month = String(monthNumber).padStart(2, '0');
+  const year = digits.slice(2);
+
+  return year ? `${month}/${year}` : `${month}/`;
+};
+
+const formatCvv = (value) => {
+  return value.replace(/\D/g, '').slice(0, 3);
+};
+
 function App() {  
   const [view, setView] = useState('catalog');  
   const [tours, setTours] = useState([]);  
@@ -220,7 +246,13 @@ function App() {
 
   const handlePaymentFormChange = (e) => {
     const { name, value } = e.target;
-    setPaymentForm({ ...paymentForm, [name]: value });
+    let nextValue = value;
+
+    if (name === 'cardNumber') nextValue = formatCardNumber(value);
+    if (name === 'expirationDate') nextValue = formatExpirationDate(value);
+    if (name === 'cvv') nextValue = formatCvv(value);
+
+    setPaymentForm({ ...paymentForm, [name]: nextValue });
   };
 
   const submitCheckout = async (e) => {
@@ -965,16 +997,16 @@ function CheckoutModal({ cart, total, paymentForm, checkoutLoading, checkoutErro
               </div>
               <div className="input-group">
                 <label>Номер карты</label>
-                <input name="cardNumber" type="text" inputMode="numeric" value={paymentForm.cardNumber} onChange={onChange} placeholder="4111 1111 1111 1111" required />
+                <input name="cardNumber" type="text" inputMode="numeric" value={paymentForm.cardNumber} onChange={onChange} placeholder="4111 1111 1111 1111" maxLength="19" required />
               </div>
               <div className="payment-row">
                 <div className="input-group">
                   <label>Срок</label>
-                  <input name="expirationDate" type="text" value={paymentForm.expirationDate} onChange={onChange} placeholder="12/28" required />
+                  <input name="expirationDate" type="text" inputMode="numeric" value={paymentForm.expirationDate} onChange={onChange} placeholder="12/28" maxLength="5" required />
                 </div>
                 <div className="input-group">
                   <label>CVV</label>
-                  <input name="cvv" type="password" inputMode="numeric" value={paymentForm.cvv} onChange={onChange} required />
+                  <input name="cvv" type="password" inputMode="numeric" value={paymentForm.cvv} onChange={onChange} maxLength="3" required />
                 </div>
               </div>
             </>
