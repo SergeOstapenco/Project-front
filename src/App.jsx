@@ -5,6 +5,7 @@ import logo from './assets/traveluxe-logo.png';
 const API_URL = 'http://localhost:5000/api/tours';
 const AUTH_API_URL = 'http://localhost:5000/api/auth';
 const CHECKOUT_API_URL = 'http://localhost:5000/api/orders/checkout';
+const ORDERS_API_URL = 'http://localhost:5000/api/orders';
 const TOKEN_STORAGE_KEY = 'travelLuxeToken';
 const USER_STORAGE_KEY = 'travelLuxeUser';
 const ACCOUNT_DATA_PREFIX = 'travelLuxeAccountData';
@@ -16,6 +17,12 @@ const emptyPaymentForm = {
   expirationDate: '',
   cvv: ''
 };
+const additionalServices = [
+  { id: 'transfer', title: 'Трансфер до отеля', price: 35, categories: ['Пляж', 'Город', 'Природа', 'Горы', 'Экскурсия'] },
+  { id: 'insurance', title: 'Расширенная страховка', price: 20, categories: ['Пляж', 'Город', 'Природа', 'Горы', 'Экскурсия'] },
+  { id: 'guide', title: 'Персональный гид', price: 50, categories: ['Город', 'Природа', 'Горы', 'Экскурсия'] },
+  { id: 'meal', title: 'Питание в дороге', price: 25, categories: ['Пляж', 'Природа', 'Горы'] }
+];
 const fallbackImages = {
   beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900',
   mountains: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900',
@@ -107,13 +114,44 @@ const formatCvv = (value) => {
   return value.replace(/\D/g, '').slice(0, 3);
 };
 
+const normalizeCartItem = (item) => ({
+  ...item,
+  people: Math.max(1, Number(item.people) || 1),
+  services: Array.isArray(item.services) ? item.services : []
+});
+
+const getAvailableServices = (tour) => {
+  const category = tour.category || '';
+  return additionalServices.filter(service => service.categories.some(item => category.includes(item)));
+};
+
+const getServiceSelectionMessage = (tour) => {
+  const category = tour.category || '';
+  if (!category.trim()) return 'Услуги недоступны: регион тура не найден';
+  if (category.toLowerCase().includes('архив')) return 'Нет свободных гидов и услуг для выбранного региона';
+  return '';
+};
+
+const getCartItemTotal = (item) => {
+  const normalizedItem = normalizeCartItem(item);
+  const servicesTotal = getAvailableServices(normalizedItem)
+    .filter(service => normalizedItem.services.includes(service.id))
+    .reduce((sum, service) => sum + service.price, 0);
+
+  return (Number(normalizedItem.price) + servicesTotal) * normalizedItem.people;
+};
+
+const getServiceTitle = (serviceId) => {
+  return additionalServices.find(service => service.id === serviceId)?.title || serviceId;
+};
+
 function App() {  
   const [view, setView] = useState('catalog');  
   const [tours, setTours] = useState([]);  
   const [loading, setLoading] = useState(true);  
   const [error, setError] = useState(null);  
   
-  const [cart, setCart] = useState(initialAccountData.cart);  
+  const [cart, setCart] = useState(initialAccountData.cart.map(normalizeCartItem));  
   const [favorites, setFavorites] = useState(initialAccountData.favorites);  
   
   const [search, setSearch] = useState('');  
@@ -137,9 +175,12 @@ function App() {
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState('');
 
   const categories = ['Все', 'Пляж', 'Горы', 'Город', 'Природа'];  
-  const cartTotal = cart.reduce((sum, item) => sum + Number(item.price), 0);
+  const cartTotal = cart.reduce((sum, item) => sum + getCartItemTotal(item), 0);
 
   const getAuthHeader = () => {
     if (!token) return {};
@@ -196,6 +237,12 @@ function App() {
     }));
   }, [favorites, cart, user]);
 
+  useEffect(() => {
+    if (view === 'orders' && user) {
+      fetchOrders();
+    }
+  }, [view, user]);
+
   const handleActionWithAuth = (action) => {
     if (!user) {
       alert("Для этого действия необходимо авторизоваться!");
@@ -203,6 +250,62 @@ function App() {
       return;
     }
     action();
+  };
+
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    setOrdersError('');
+
+    try {
+      const response = await fetch(ORDERS_API_URL, {
+        headers: getAuthHeader()
+      });
+
+      if (response.status === 401) {
+        handleAuthExpired();
+        return;
+      }
+
+      if (!response.ok) {
+        setOrdersError(`Ошибка загрузки заказов: ${response.status}`);
+        return;
+      }
+
+      setOrders(await response.json());
+    } catch {
+      setOrdersError('Сервер C# не отвечает');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm('Отменить тур и оформить возврат?')) return;
+
+    try {
+      const response = await fetch(`${ORDERS_API_URL}/${orderId}/cancel`, {
+        method: 'POST',
+        headers: getAuthHeader()
+      });
+
+      const responseText = await response.text();
+      const data = responseText ? JSON.parse(responseText) : {};
+
+      if (response.status === 401) {
+        handleAuthExpired();
+        return;
+      }
+
+      if (!response.ok) {
+        alert(data.message || `Ошибка отмены: ${response.status}`);
+        return;
+      }
+
+      alert(`Тур отменён. Сумма возврата: $${data.refundAmount}`);
+      fetchOrders();
+    } catch {
+      alert('Сервер C# не отвечает');
+    }
   };
 
   const toggleFavorite = (item) => {
@@ -217,7 +320,13 @@ function App() {
 
   const addToCart = (item) => {
     handleActionWithAuth(() => {
-      setCart([...cart, item]);
+      if (cart.some(cartItem => cartItem.id === item.id)) {
+        alert('Этот тур уже есть в корзине. Можно изменить количество людей и услуги внутри корзины.');
+        setView('cart');
+        return;
+      }
+
+      setCart([...cart, normalizeCartItem(item)]);
     });
   };
 
@@ -225,6 +334,25 @@ function App() {
     const newCart = [...cart];
     newCart.splice(index, 1);
     setCart(newCart);
+  };
+
+  const updateCartItemPeople = (id, nextPeople) => {
+    setCart(cart.map(item => (
+      item.id === id ? { ...normalizeCartItem(item), people: Math.max(1, Math.min(20, nextPeople)) } : item
+    )));
+  };
+
+  const toggleCartItemService = (id, serviceId) => {
+    setCart(cart.map(item => {
+      if (item.id !== id) return item;
+
+      const normalizedItem = normalizeCartItem(item);
+      const nextServices = normalizedItem.services.includes(serviceId)
+        ? normalizedItem.services.filter(itemServiceId => itemServiceId !== serviceId)
+        : [...normalizedItem.services, serviceId];
+
+      return { ...normalizedItem, services: nextServices };
+    }));
   };
 
   const clearCart = () => {
@@ -268,7 +396,14 @@ function App() {
           ...getAuthHeader()
         },
         body: JSON.stringify({
-          tourIds: cart.map(item => item.id),
+          tourIds: cart.flatMap(item => Array.from({ length: normalizeCartItem(item).people }, () => item.id)),
+          items: cart.map(item => ({
+            tourId: item.id,
+            people: normalizeCartItem(item).people,
+            services: normalizeCartItem(item).services,
+            totalPrice: getCartItemTotal(item)
+          })),
+          totalPrice: cartTotal,
           ...paymentForm
         })
       });
@@ -295,6 +430,7 @@ function App() {
       setIsCheckoutOpen(false);
       setPaymentForm(emptyPaymentForm);
       alert(`Заказ #${data.orderId} успешно оплачен`);
+      fetchOrders();
     } catch (err) {
       setCheckoutError(err instanceof SyntaxError ? 'Сервер вернул неверный ответ' : 'Сервер C# не отвечает');
     } finally {
@@ -433,7 +569,7 @@ function App() {
       if (editingTourId) {
         setTours(tours.map(t => t.id === editingTourId ? savedTour : t));
         setFavorites(favorites.map(t => t.id === editingTourId ? savedTour : t));
-        setCart(cart.map(t => t.id === editingTourId ? savedTour : t));
+        setCart(cart.map(t => t.id === editingTourId ? normalizeCartItem({ ...savedTour, people: t.people, services: t.services }) : t));
         if (selectedTour?.id === editingTourId) {
           setSelectedTour(savedTour);
           setGalleryIndex(0);
@@ -478,7 +614,7 @@ function App() {
       
       const accountData = getSavedAccountData(data.user.id);
       setFavorites(accountData.favorites);
-      setCart(accountData.cart);
+      setCart(accountData.cart.map(normalizeCartItem));
 
       setUsername('');
       setPassword('');
@@ -559,6 +695,7 @@ function App() {
         <nav className="nav-menu">  
           <span className={`nav-link ${view === 'catalog' ? 'active' : ''}`} onClick={() => setView('catalog')}>Каталог</span>  
           <span className={`nav-link ${view === 'favorites' ? 'active' : ''}`} onClick={() => handleActionWithAuth(() => setView('favorites'))}>Избранное ({user ? favorites.length : 0})</span>  
+          <span className={`nav-link ${view === 'orders' ? 'active' : ''}`} onClick={() => handleActionWithAuth(() => setView('orders'))}>Заказы</span>
           {user?.role === 'admin' && (
             <span className={`nav-link ${view === 'admin' ? 'active' : ''}`} onClick={() => setView('admin')}>Админ</span>
           )}
@@ -800,21 +937,67 @@ function App() {
                   <div className="cart-list-header">
                     <button className="clear-cart-btn-minimal" onClick={clearCart}>Очистить всё</button>
                   </div>
-                  {cart.map((item, i) => (
-                    <div key={i} className="cart-item-card">
+                  {cart.map((item, i) => {
+                    const normalizedItem = normalizeCartItem(item);
+                    const availableServices = getAvailableServices(normalizedItem);
+                    const servicesMessage = getServiceSelectionMessage(normalizedItem);
+                    const selectedServicesTotal = availableServices
+                      .filter(service => normalizedItem.services.includes(service.id))
+                      .reduce((sum, service) => sum + service.price, 0);
+
+                    return (
+                    <div key={normalizedItem.id} className="cart-item-card">
                       <img src={getTourImage(item)} alt={item.title} className="cart-item-img" />
                       <div className="cart-item-info">
                         <h4>{item.title}</h4>
                         <p>{item.category}</p>
+
+                        <div className="cart-config">
+                          <div className="people-control">
+                            <span>Людей</span>
+                            <div className="stepper">
+                              <button onClick={() => updateCartItemPeople(normalizedItem.id, normalizedItem.people - 1)} disabled={normalizedItem.people <= 1}>−</button>
+                              <strong>{normalizedItem.people}</strong>
+                              <button onClick={() => updateCartItemPeople(normalizedItem.id, normalizedItem.people + 1)}>+</button>
+                            </div>
+                          </div>
+
+                          <div className="service-picker">
+                            <span>Доп. услуги</span>
+                            {servicesMessage ? (
+                              <p className="service-message">{servicesMessage}</p>
+                            ) : (
+                              <div className="service-list">
+                                {availableServices.map(service => (
+                                  <label key={service.id} className="service-option">
+                                    <input
+                                      type="checkbox"
+                                      checked={normalizedItem.services.includes(service.id)}
+                                      onChange={() => toggleCartItemService(normalizedItem.id, service.id)}
+                                    />
+                                    <span>{service.title}</span>
+                                    <strong>+${service.price}</strong>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="cart-item-price">${item.price}</div>
+                      <div className="cart-item-price">
+                        <small>Тур: ${item.price} × {normalizedItem.people}</small>
+                        {selectedServicesTotal > 0 && <small>Услуги: ${selectedServicesTotal} × {normalizedItem.people}</small>}
+                        <strong>${getCartItemTotal(normalizedItem)}</strong>
+                      </div>
                       <button className="remove-item-btn" onClick={() => removeFromCart(i)}>✕</button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="cart-summary-panel">
                   <h3>Итог заказа</h3>
                   <div className="summary-row"><span>Туров:</span><span>{cart.length}</span></div>
+                  <div className="summary-row"><span>Людей:</span><span>{cart.reduce((sum, item) => sum + normalizeCartItem(item).people, 0)}</span></div>
                   <div className="summary-total"><span>К оплате:</span><span>${cartTotal}</span></div>
                   <button className="checkout-btn" onClick={openCheckout}>Оформить заказ</button>
                 </div>
@@ -827,6 +1010,57 @@ function App() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {view === 'orders' && (
+        <div className="page-content orders-page">
+          <h2 className="page-title">Мои заказы</h2>
+          {ordersLoading ? (
+            <div className="state-msg">Загрузка заказов...</div>
+          ) : ordersError ? (
+            <div className="state-msg">{ordersError}</div>
+          ) : orders.length > 0 ? (
+            <div className="orders-list">
+              {orders.map(order => (
+                <div className="order-card" key={order.id}>
+                  <div className="order-card-head">
+                    <div>
+                      <span className={`order-status ${order.status === 'Cancelled' ? 'cancelled' : ''}`}>
+                        {order.status === 'Cancelled' ? 'Отменён' : 'Оплачен'}
+                      </span>
+                      <h3>Заказ #{order.id}</h3>
+                      <p>{new Date(order.createdAt).toLocaleDateString('ru-RU')}</p>
+                    </div>
+                    <strong>${order.totalPrice}</strong>
+                  </div>
+
+                  <div className="order-items">
+                    {order.items.map((item, index) => (
+                      <div className="order-item-row" key={`${order.id}-${index}`}>
+                        <span>{item.tourTitle}</span>
+                        <span>{item.people} чел.</span>
+                        <span>
+                          {item.services
+                            ? item.services.split(',').filter(Boolean).map(getServiceTitle).join(', ')
+                            : 'Без услуг'}
+                        </span>
+                        <strong>${item.totalPrice}</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  {order.status !== 'Cancelled' && (
+                    <button className="cancel-order-btn" onClick={() => cancelOrder(order.id)}>
+                      Отменить тур
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state"><p>У вас пока нет оформленных заказов</p></div>
+          )}
         </div>
       )}
 
@@ -871,6 +1105,7 @@ function App() {
         <CheckoutModal
           cart={cart}
           total={cartTotal}
+          peopleCount={cart.reduce((sum, item) => sum + normalizeCartItem(item).people, 0)}
           paymentForm={paymentForm}
           checkoutLoading={checkoutLoading}
           checkoutError={checkoutError}
@@ -965,7 +1200,7 @@ function TourDetailsModal({ tour, images, galleryIndex, setGalleryIndex, onClose
   );
 }
 
-function CheckoutModal({ cart, total, paymentForm, checkoutLoading, checkoutError, onChange, onClose, onSubmit }) {
+function CheckoutModal({ cart, total, peopleCount, paymentForm, checkoutLoading, checkoutError, onChange, onClose, onSubmit }) {
   const isCardPayment = paymentForm.paymentMethod === 'card';
 
   return (
@@ -975,7 +1210,7 @@ function CheckoutModal({ cart, total, paymentForm, checkoutLoading, checkoutErro
         <h2>Оплата заказа</h2>
 
         <div className="checkout-summary">
-          <span>Туров: {cart.length}</span>
+          <span>Туров: {cart.length} · Людей: {peopleCount}</span>
           <strong>${total}</strong>
         </div>
 
