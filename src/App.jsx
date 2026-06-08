@@ -6,10 +6,13 @@ const API_URL = 'http://localhost:5000/api/tours';
 const AUTH_API_URL = 'http://localhost:5000/api/auth';
 const CHECKOUT_API_URL = 'http://localhost:5000/api/orders/checkout';
 const ORDERS_API_URL = 'http://localhost:5000/api/orders';
+const REVIEWS_API_URL = 'http://localhost:5000/api/reviews';
 const TOKEN_STORAGE_KEY = 'travelLuxeToken';
 const USER_STORAGE_KEY = 'travelLuxeUser';
 const ACCOUNT_DATA_PREFIX = 'travelLuxeAccountData';
 const emptyTourForm = { title: '', price: '', category: '', img: '', description: '', images: '' };
+const emptyReviewData = { averageRating: 0, reviewsCount: 0, reviews: [] };
+const emptyReviewForm = { rating: 5, comment: '' };
 const emptyPaymentForm = {
   paymentMethod: 'card',
   cardholderName: '',
@@ -178,6 +181,12 @@ function App() {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState('');
+  const [reviewData, setReviewData] = useState(emptyReviewData);
+  const [reviewForm, setReviewForm] = useState(emptyReviewForm);
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [pendingReviews, setPendingReviews] = useState([]);
+  const [pendingReviewsLoading, setPendingReviewsLoading] = useState(false);
 
   const categories = ['Все', 'Пляж', 'Горы', 'Город', 'Природа'];  
   const cartTotal = cart.reduce((sum, item) => sum + getCartItemTotal(item), 0);
@@ -243,6 +252,18 @@ function App() {
     }
   }, [view, user]);
 
+  useEffect(() => {
+    if (selectedTour) {
+      fetchTourReviews(selectedTour.id);
+    }
+  }, [selectedTour?.id]);
+
+  useEffect(() => {
+    if (view === 'admin' && user?.role === 'admin') {
+      fetchPendingReviews();
+    }
+  }, [view, user]);
+
   const handleActionWithAuth = (action) => {
     if (!user) {
       alert("Для этого действия необходимо авторизоваться!");
@@ -276,6 +297,137 @@ function App() {
       setOrdersError('Сервер C# не отвечает');
     } finally {
       setOrdersLoading(false);
+    }
+  };
+
+  const fetchTourReviews = async (tourId) => {
+    setReviewMessage('');
+    setReviewData(emptyReviewData);
+
+    try {
+      const response = await fetch(`${REVIEWS_API_URL}/tour/${tourId}`);
+
+      if (!response.ok) {
+        setReviewMessage(`Ошибка загрузки отзывов: ${response.status}`);
+        return;
+      }
+
+      setReviewData(await response.json());
+    } catch {
+      setReviewMessage('Сервер C# не отвечает');
+    }
+  };
+
+  const fetchPendingReviews = async () => {
+    setPendingReviewsLoading(true);
+
+    try {
+      const response = await fetch(`${REVIEWS_API_URL}/pending`, {
+        headers: getAuthHeader()
+      });
+
+      if (response.status === 401) {
+        handleAuthExpired();
+        return;
+      }
+
+      if (response.status === 403) {
+        handleAdminAccessDenied();
+        return;
+      }
+
+      if (!response.ok) {
+        setAdminMessage(`Ошибка загрузки отзывов: ${response.status}`);
+        return;
+      }
+
+      setPendingReviews(await response.json());
+    } catch {
+      setAdminMessage('Сервер C# не отвечает');
+    } finally {
+      setPendingReviewsLoading(false);
+    }
+  };
+
+  const submitReview = async (e) => {
+    e.preventDefault();
+
+    handleActionWithAuth(async () => {
+      if (!selectedTour) return;
+      setReviewLoading(true);
+      setReviewMessage('');
+
+      try {
+        const response = await fetch(REVIEWS_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeader()
+          },
+          body: JSON.stringify({
+            tourId: selectedTour.id,
+            rating: Number(reviewForm.rating),
+            comment: reviewForm.comment.trim()
+          })
+        });
+
+        const responseText = await response.text();
+        const data = responseText ? JSON.parse(responseText) : {};
+
+        if (response.status === 401) {
+          handleAuthExpired();
+          return;
+        }
+
+        if (!response.ok) {
+          setReviewMessage(data.message || `Ошибка отправки отзыва: ${response.status}`);
+          return;
+        }
+
+        setReviewForm(emptyReviewForm);
+        setReviewMessage('Отзыв отправлен');
+        if (user?.role === 'admin') fetchPendingReviews();
+      } catch {
+        setReviewMessage('Сервер C# не отвечает');
+      } finally {
+        setReviewLoading(false);
+      }
+    });
+  };
+
+  const moderateReview = async (reviewId, status) => {
+    try {
+      const response = await fetch(`${REVIEWS_API_URL}/${reviewId}/moderate`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        },
+        body: JSON.stringify({ status })
+      });
+
+      const responseText = await response.text();
+      const data = responseText ? JSON.parse(responseText) : {};
+
+      if (response.status === 401) {
+        handleAuthExpired();
+        return;
+      }
+
+      if (response.status === 403) {
+        handleAdminAccessDenied();
+        return;
+      }
+
+      if (!response.ok) {
+        alert(data.message || `Ошибка модерации: ${response.status}`);
+        return;
+      }
+
+      setPendingReviews(pendingReviews.filter(review => review.id !== reviewId));
+      if (selectedTour) fetchTourReviews(selectedTour.id);
+    } catch {
+      alert('Сервер C# не отвечает');
     }
   };
 
@@ -924,6 +1076,39 @@ function App() {
               ))}
             </div>
           </div>
+
+          <section className="review-moderation">
+            <div className="review-moderation-head">
+              <div>
+                <h3>Модерация отзывов</h3>
+                <p>Проверяйте отзывы пользователей перед публикацией на странице тура.</p>
+              </div>
+              <button className="admin-secondary-btn" onClick={fetchPendingReviews}>Обновить</button>
+            </div>
+
+            {pendingReviewsLoading ? (
+              <div className="state-msg compact-state">Загрузка отзывов...</div>
+            ) : pendingReviews.length > 0 ? (
+              <div className="pending-review-list">
+                {pendingReviews.map(review => (
+                  <div className="pending-review-card" key={review.id}>
+                    <div>
+                      <span className="review-tour-name">{review.tourTitle}</span>
+                      <h4>{review.username}</h4>
+                      <div className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
+                      <p>{review.comment}</p>
+                    </div>
+                    <div className="review-actions">
+                      <button onClick={() => moderateReview(review.id, 'Approved')}>Одобрить</button>
+                      <button className="danger-action" onClick={() => moderateReview(review.id, 'Rejected')}>Отклонить</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state review-empty"><p>Новых отзывов на проверку нет</p></div>
+            )}
+          </section>
         </div>
       )}
 
@@ -1098,6 +1283,13 @@ function App() {
           onAdd={() => addToCart(selectedTour)}
           isFavorite={favorites.some(f => f.id === selectedTour.id)}
           onFavorite={() => toggleFavorite(selectedTour)}
+          user={user}
+          reviewData={reviewData}
+          reviewForm={reviewForm}
+          reviewMessage={reviewMessage}
+          reviewLoading={reviewLoading}
+          onReviewChange={(e) => setReviewForm({ ...reviewForm, [e.target.name]: e.target.value })}
+          onReviewSubmit={submitReview}
         />
       )}
 
@@ -1148,7 +1340,23 @@ function TourCard({ item, onAdd, isAdmin, onDelete, onEdit, isFavorite, onFavori
   );  
 }  
 
-function TourDetailsModal({ tour, images, galleryIndex, setGalleryIndex, onClose, onAdd, isFavorite, onFavorite }) {
+function TourDetailsModal({
+  tour,
+  images,
+  galleryIndex,
+  setGalleryIndex,
+  onClose,
+  onAdd,
+  isFavorite,
+  onFavorite,
+  user,
+  reviewData,
+  reviewForm,
+  reviewMessage,
+  reviewLoading,
+  onReviewChange,
+  onReviewSubmit
+}) {
   const currentImage = images[galleryIndex] || tour.img;
   const hasGallery = images.length > 1;
 
@@ -1180,6 +1388,13 @@ function TourDetailsModal({ tour, images, galleryIndex, setGalleryIndex, onClose
             <div>
               <span className="tour-category">{tour.category}</span>
               <h2>{tour.title}</h2>
+              <div className="tour-rating-summary">
+                <span>{reviewData.averageRating > 0 ? reviewData.averageRating.toFixed(1) : '0.0'}</span>
+                <div>
+                  <strong>{'★'.repeat(Math.round(reviewData.averageRating))}{'☆'.repeat(5 - Math.round(reviewData.averageRating))}</strong>
+                  <small>{reviewData.reviewsCount} отзывов</small>
+                </div>
+              </div>
             </div>
             <span className="tour-detail-price">${tour.price}</span>
           </div>
@@ -1193,6 +1408,71 @@ function TourDetailsModal({ tour, images, galleryIndex, setGalleryIndex, onClose
             <button className={`favorite-detail-btn ${isFavorite ? 'active' : ''}`} onClick={onFavorite}>
               {isFavorite ? 'В избранном' : 'В избранное'}
             </button>
+          </div>
+
+          <div className="tour-reviews">
+            <div className="tour-reviews-head">
+              <h3>Отзывы и рейтинг</h3>
+              <span>{reviewData.averageRating > 0 ? `${reviewData.averageRating.toFixed(1)} из 5` : 'Пока нет оценок'}</span>
+            </div>
+
+            {user ? (
+              <form className="review-form" onSubmit={onReviewSubmit}>
+                <div className="review-form-row">
+                  <div className="input-group">
+                    <label>Оценка</label>
+                    <div className="rating-picker" role="radiogroup" aria-label="Оценка тура">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <button
+                          key={star}
+                          type="button"
+                          className={Number(reviewForm.rating) >= star ? 'active' : ''}
+                          onClick={() => onReviewChange({ target: { name: 'rating', value: star } })}
+                          aria-label={`${star} из 5`}
+                          aria-checked={Number(reviewForm.rating) === star}
+                          role="radio"
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>Ваш отзыв</label>
+                  <textarea
+                    name="comment"
+                    value={reviewForm.comment}
+                    onChange={onReviewChange}
+                    placeholder="Что понравилось в туре?"
+                    minLength="5"
+                    required
+                  />
+                </div>
+                {reviewMessage && <p className="review-message">{reviewMessage}</p>}
+                <button type="submit" className="add-btn" disabled={reviewLoading}>
+                  {reviewLoading ? 'Отправка...' : 'Отправить'}
+                </button>
+              </form>
+            ) : (
+              <p className="review-login-note">Войдите в аккаунт, чтобы оставить отзыв.</p>
+            )}
+
+            <div className="approved-review-list">
+              {reviewData.reviews.length > 0 ? (
+                reviewData.reviews.map(review => (
+                  <div className="approved-review-card" key={review.id}>
+                    <div className="approved-review-head">
+                      <strong>{review.username}</strong>
+                      <span>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
+                    </div>
+                    <p>{review.comment}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="review-login-note">Одобренных отзывов пока нет.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

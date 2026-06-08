@@ -276,6 +276,99 @@ body, html, #root {
 }
 .admin-row-actions .danger-action { background: #fee2e2; color: var(--danger); }
 
+.review-moderation {
+  margin-top: 32px;
+  background: white;
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.review-moderation-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.review-moderation-head h3 {
+  font-family: 'Montserrat';
+  font-size: 1.35rem;
+  margin-bottom: 6px;
+}
+
+.review-moderation-head p {
+  color: var(--text-light);
+  font-weight: 700;
+}
+
+.pending-review-list {
+  display: grid;
+  gap: 16px;
+}
+
+.pending-review-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 24px;
+  align-items: center;
+  padding: 18px;
+  border: 1.5px solid #eef2f7;
+  border-radius: 18px;
+}
+
+.review-tour-name {
+  color: var(--primary-dark);
+  font-weight: 900;
+}
+
+.pending-review-card h4 {
+  font-family: 'Montserrat';
+  margin: 6px 0;
+}
+
+.review-stars {
+  color: #f59e0b;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.pending-review-card p {
+  color: var(--text-light);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.review-actions button {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 900;
+  cursor: pointer;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.review-actions .danger-action {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.review-empty {
+  padding: 30px 0;
+}
+
+.compact-state {
+  padding: 30px;
+}
+
 .cart-wrapper { max-width: 1280px; margin: 0 auto; }
 .cart-main-layout {
   display: grid;
@@ -614,6 +707,35 @@ body, html, #root {
   font-family: 'Montserrat';
   font-size: 2rem;
 }
+.tour-rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.tour-rating-summary > span {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #fef3c7;
+  color: #b45309;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
+.tour-rating-summary div {
+  display: grid;
+  gap: 2px;
+}
+.tour-rating-summary strong {
+  color: #f59e0b;
+  letter-spacing: 0;
+}
+.tour-rating-summary small {
+  color: var(--text-light);
+  font-weight: 800;
+}
 .tour-detail-price {
   color: var(--primary);
   font-size: 2.2rem;
@@ -645,6 +767,130 @@ body, html, #root {
   color: var(--danger);
   background: #fff1f2;
   border-color: #fecdd3;
+}
+
+.tour-reviews {
+  margin-top: 34px;
+  padding-top: 28px;
+  border-top: 1.5px solid #eef2f7;
+}
+
+.tour-reviews-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.tour-reviews-head h3 {
+  font-family: 'Montserrat';
+  font-size: 1.35rem;
+}
+
+.tour-reviews-head span {
+  color: var(--primary-dark);
+  font-weight: 900;
+}
+
+.review-form {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  border-radius: 20px;
+  background: #f8fafc;
+}
+
+.review-form-row {
+  max-width: 320px;
+}
+
+.rating-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+}
+
+.rating-picker button {
+  width: 42px;
+  height: 42px;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 2rem;
+  line-height: 1;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.rating-picker button.active {
+  color: #f59e0b;
+}
+
+.rating-picker button:hover {
+  color: #f59e0b;
+  transform: translateY(-2px);
+}
+
+.rating-picker button:focus-visible {
+  outline: 3px solid rgba(22, 173, 210, 0.25);
+  border-radius: 10px;
+}
+
+.review-form textarea {
+  min-height: 110px;
+}
+
+.review-form .add-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.review-message {
+  color: var(--primary-dark);
+  font-weight: 900;
+}
+
+.review-login-note {
+  color: var(--text-light);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.approved-review-list {
+  display: grid;
+  gap: 14px;
+}
+
+.approved-review-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1.5px solid #eef2f7;
+}
+
+.approved-review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.approved-review-head strong {
+  color: var(--text);
+}
+
+.approved-review-head span {
+  color: #f59e0b;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.approved-review-card p {
+  color: var(--text-light);
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 .checkout-backdrop {
@@ -743,11 +989,16 @@ body, html, #root {
   .admin-table-head { display: none; }
   .admin-table-row { grid-template-columns: 1fr; }
   .admin-row-actions { justify-content: flex-start; }
+  .review-moderation-head { flex-direction: column; }
+  .pending-review-card { grid-template-columns: 1fr; }
+  .review-actions { justify-content: flex-start; flex-wrap: wrap; }
   .tour-modal-backdrop { padding: 14px; align-items: flex-start; }
   .tour-gallery { height: 280px; }
   .tour-detail-heading { flex-direction: column; }
   .tour-detail-price { font-size: 1.8rem; }
   .tour-detail-content { padding: 24px; }
+  .tour-reviews-head { flex-direction: column; align-items: flex-start; }
+  .review-form-row { max-width: none; }
   .checkout-modal { padding: 28px; }
   .payment-row { grid-template-columns: 1fr; }
   .cart-main-layout { grid-template-columns: 1fr; }
