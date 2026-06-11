@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';  
+import { Heart } from 'lucide-react';
 import './App.css';  
 import logo from './assets/traveluxe-logo.png';
 
@@ -860,7 +861,7 @@ function App() {
               Выйти ({user.role === 'admin' ? 'Админ' : user.username})
             </span>
           )}
-          <button className="cart-btn-main" onClick={() => handleActionWithAuth(() => setView('cart'))}>🛒 ({user ? cart.length : 0})</button>  
+          <button className="cart-btn-main" onClick={() => handleActionWithAuth(() => setView('cart'))}>Корзина ({user ? cart.length : 0})</button>  
         </nav>  
       </header>  
 
@@ -1189,7 +1190,7 @@ function App() {
               </div>
             ) : (
               <div className="empty-cart-state">
-                <div className="empty-icon">🛒</div>
+                <div className="empty-icon">0</div>
                 <p>В корзине пока ничего нет</p>
                 <button className="back-to-catalog" onClick={() => setView('catalog')}>Вернуться к турам</button>
               </div>
@@ -1343,8 +1344,8 @@ function TourCard({ item, onAdd, isAdmin, onDelete, onEdit, isFavorite, onFavori
     <div className="modern-card" onClick={onOpen}>  
       <div className="card-image-h">
         <img src={getTourImage ? getTourImage(item) : item.img} alt={item.title} />
-        <button className={`fav-btn-overlay ${isFavorite ? 'active' : ''}`} onClick={(e) => handleButtonClick(e, onFavorite)}>
-          {isFavorite ? '❤️' : '🤍'}
+        <button className={`fav-btn-overlay ${isFavorite ? 'active' : ''}`} onClick={(e) => handleButtonClick(e, onFavorite)} aria-label={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}>
+          <Heart size={24} strokeWidth={2.4} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
       </div>  
       <div className="card-content">  
