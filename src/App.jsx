@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';  
+import React, { useState, useEffect, useMemo } from 'react';  
 import { Heart } from 'lucide-react';
 import './App.css';  
 import logo from './assets/traveluxe-logo.png';
 
 const API_URL = 'http://localhost:5000/api/tours';
+const CATEGORY_API_URL = 'http://localhost:5000/api/categories';
 const AUTH_API_URL = 'http://localhost:5000/api/auth';
 const CHECKOUT_API_URL = 'http://localhost:5000/api/orders/checkout';
 const ORDERS_API_URL = 'http://localhost:5000/api/orders';
@@ -11,7 +12,7 @@ const REVIEWS_API_URL = 'http://localhost:5000/api/reviews';
 const TOKEN_STORAGE_KEY = 'travelLuxeToken';
 const USER_STORAGE_KEY = 'travelLuxeUser';
 const ACCOUNT_DATA_PREFIX = 'travelLuxeAccountData';
-const emptyTourForm = { title: '', price: '', category: '', img: '', description: '', images: '' };
+const emptyTourForm = { title: '', price: '', categoryId: '', category: '', img: '', description: '', images: '' };
 const emptyReviewData = { averageRating: 0, reviewsCount: 0, reviews: [] };
 const emptyReviewForm = { rating: 5, comment: '' };
 const emptyPaymentForm = {
@@ -73,6 +74,22 @@ const getSavedAccountData = (userId) => {
 const initialToken = getSavedToken();
 const initialUser = initialToken ? getSavedUser() : null;
 const initialAccountData = getSavedAccountData(initialUser?.id);
+
+const normalizeCategory = (value) => String(value || '').trim().toLowerCase();
+
+const getUniqueCategoryNames = (values) => {
+  const seen = new Set();
+
+  return values
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+    .filter(item => {
+      const normalized = normalizeCategory(item);
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+};
 
 const parseTourImages = (value) => {
   if (!value) return [];
@@ -160,6 +177,8 @@ function App() {
   
   const [search, setSearch] = useState('');  
   const [category, setCategory] = useState('Все');  
+  const [categories, setCategories] = useState([]);
+  const [categoryForm, setCategoryForm] = useState('');
 
   const [user, setUser] = useState(initialUser);
   const [token, setToken] = useState(initialToken);
@@ -189,7 +208,31 @@ function App() {
   const [pendingReviews, setPendingReviews] = useState([]);
   const [pendingReviewsLoading, setPendingReviewsLoading] = useState(false);
 
-  const categories = ['Все', 'Пляж', 'Горы', 'Город', 'Природа'];  
+  const categoryOptions = useMemo(() => {
+    const optionsByName = new Map();
+
+    categories.forEach(item => {
+      if (!item?.name) return;
+      optionsByName.set(normalizeCategory(item.name), {
+        id: String(item.id),
+        name: item.name
+      });
+    });
+
+    getUniqueCategoryNames(tours.map(tour => tour.category)).forEach(name => {
+      const normalized = normalizeCategory(name);
+      if (optionsByName.has(normalized)) return;
+
+      optionsByName.set(normalized, {
+        id: `name:${name}`,
+        name
+      });
+    });
+
+    return Array.from(optionsByName.values());
+  }, [categories, tours]);
+
+  const filterCategories = useMemo(() => ['Все', ...categoryOptions.map(item => item.name)], [categoryOptions]);  
   const cartTotal = cart.reduce((sum, item) => sum + getCartItemTotal(item), 0);
 
   const getAuthHeader = () => {
@@ -234,8 +277,19 @@ function App() {
       });
   };
 
+  const fetchCategories = () => {
+    fetch(CATEGORY_API_URL)
+      .then(res => {
+        if (!res.ok) throw new Error('Ошибка загрузки категорий');
+        return res.json();
+      })
+      .then(data => setCategories(Array.isArray(data) ? data : []))
+      .catch(() => setCategories([]));
+  };
+
   useEffect(() => {  
     fetchTours();
+    fetchCategories();
   }, []);  
 
   useEffect(() => {
@@ -652,7 +706,118 @@ function App() {
 
   const handleTourFormChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'categoryId') {
+      const selectedCategory = categoryOptions.find(item => item.id === value);
+      setTourForm({
+        ...tourForm,
+        categoryId: value,
+        category: selectedCategory?.name || ''
+      });
+      return;
+    }
+
     setTourForm({ ...tourForm, [name]: value });
+  };
+
+  const createCategory = async () => {
+    const name = categoryForm.trim();
+
+    if (!name) {
+      setAdminMessage('Введите название категории');
+      return;
+    }
+
+    try {
+      const response = await fetch(CATEGORY_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader()
+        },
+        body: JSON.stringify({ name })
+      });
+
+      const responseText = await response.text();
+      const data = responseText ? JSON.parse(responseText) : {};
+
+      if (response.status === 401) {
+        handleAuthExpired();
+        return;
+      }
+
+      if (response.status === 403) {
+        handleAdminAccessDenied();
+        return;
+      }
+
+      if (response.status === 409) {
+        fetchCategories();
+        setAdminMessage('Такая категория уже есть. Список категорий обновлён.');
+        return;
+      }
+
+      if (!response.ok) {
+        setAdminMessage(data.message || `Ошибка создания категории: ${response.status}. Проверьте, что backend обновлён и миграция применена.`);
+        return;
+      }
+
+      setCategories([...categories.filter(item => normalizeCategory(item.name) !== normalizeCategory(data.name)), data]);
+      setTourForm({ ...tourForm, categoryId: String(data.id), category: data.name });
+      setCategoryForm('');
+      setAdminMessage('Категория добавлена');
+    } catch {
+      setAdminMessage('Сервер C# не отвечает');
+    }
+  };
+
+  const deleteCategory = async (categoryToDelete) => {
+    if (!categoryToDelete?.id || String(categoryToDelete.id).startsWith('name:')) {
+      setAdminMessage('Эта категория взята из существующего тура, но её ещё нет в таблице категорий. Создайте категорию с таким же названием или примените миграцию.');
+      return;
+    }
+
+    const isUsed = tours.some(tour => normalizeCategory(tour.category) === normalizeCategory(categoryToDelete.name));
+    if (isUsed) {
+      setAdminMessage('Нельзя удалить категорию, пока в ней есть туры. Сначала перенесите эти туры в другую категорию или удалите их.');
+      return;
+    }
+
+    if (!window.confirm(`Удалить категорию "${categoryToDelete.name}"?`)) return;
+
+    try {
+      const response = await fetch(`${CATEGORY_API_URL}/${categoryToDelete.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeader()
+      });
+
+      const responseText = await response.text();
+      const data = responseText ? JSON.parse(responseText) : {};
+
+      if (response.status === 401) {
+        handleAuthExpired();
+        return;
+      }
+
+      if (response.status === 403) {
+        handleAdminAccessDenied();
+        return;
+      }
+
+      if (!response.ok) {
+        setAdminMessage(data.message || `Ошибка удаления категории: ${response.status}`);
+        return;
+      }
+
+      setCategories(categories.filter(item => String(item.id) !== String(categoryToDelete.id)));
+      if (String(tourForm.categoryId) === String(categoryToDelete.id)) {
+        setTourForm({ ...tourForm, categoryId: '', category: '' });
+      }
+      if (normalizeCategory(category) === normalizeCategory(categoryToDelete.name)) setCategory('Все');
+      setAdminMessage('Категория удалена');
+    } catch {
+      setAdminMessage('Сервер C# не отвечает');
+    }
   };
 
   const openTour = (tour) => {
@@ -669,6 +834,9 @@ function App() {
     setTourForm({
       title: tour.title,
       price: String(tour.price),
+      categoryId: tour.categoryId
+        ? String(tour.categoryId)
+        : (categoryOptions.find(item => normalizeCategory(item.name) === normalizeCategory(tour.category))?.id || ''),
       category: tour.category,
       img: tour.img,
       description: tour.description || '',
@@ -684,6 +852,7 @@ function App() {
     const tourData = {
       title: tourForm.title.trim(),
       price: Number(tourForm.price),
+      categoryId: tourForm.categoryId && !tourForm.categoryId.startsWith('name:') ? Number(tourForm.categoryId) : null,
       category: tourForm.category.trim(),
       img: tourForm.img.trim() || getImageForCategory(tourForm.category || tourForm.title),
       description: tourForm.description.trim(),
@@ -836,7 +1005,7 @@ function App() {
 
   const filtered = tours.filter(item =>  
     item.title.toLowerCase().includes(search.toLowerCase()) &&  
-    (category === 'Все' || item.category === category)  
+    (category === 'Все' || normalizeCategory(item.category) === normalizeCategory(category))  
   );  
 
   return (  
@@ -960,7 +1129,7 @@ function App() {
             </div>
 
             <div className="filter-chips">  
-              {categories.map(cat => (  
+              {filterCategories.map(cat => (  
                 <button key={cat} className={`chip ${category === cat ? 'active' : ''}`} onClick={() => setCategory(cat)}>{cat}</button>  
               ))}  
             </div>  
@@ -1032,7 +1201,46 @@ function App() {
               </div>
               <div className="input-group">
                 <label>Категория</label>
-                <input name="category" type="text" value={tourForm.category} onChange={handleTourFormChange} />
+                <select name="categoryId" value={tourForm.categoryId} onChange={handleTourFormChange}>
+                  <option value="">Выберите категорию</option>
+                  {categoryOptions.map(item => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="category-create-row">
+                <input
+                  type="text"
+                  value={categoryForm}
+                  onChange={(e) => setCategoryForm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    createCategory();
+                  }}
+                  placeholder="Новая категория"
+                />
+                <button type="button" className="admin-secondary-btn" onClick={createCategory}>Создать</button>
+              </div>
+              {adminMessage && <p className="admin-message category-message">{adminMessage}</p>}
+              <div className="category-manage-list">
+                {categoryOptions.map(item => {
+                  const isUsed = tours.some(tour => normalizeCategory(tour.category) === normalizeCategory(item.name));
+
+                  return (
+                    <div className="category-manage-item" key={item.id}>
+                      <span>{item.name}</span>
+                      <button
+                        type="button"
+                        className="danger-action"
+                        title={isUsed ? 'Сначала перенесите или удалите туры из этой категории' : 'Удалить категорию'}
+                        onClick={() => deleteCategory(item)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
               <div className="input-group">
                 <label>Ссылка на изображение</label>
@@ -1047,7 +1255,6 @@ function App() {
                 <textarea name="images" value={tourForm.images} onChange={handleTourFormChange} rows="5" placeholder="Каждая ссылка с новой строки" />
               </div>
               <p className="admin-form-hint">Главное изображение можно оставить пустым. Дополнительные фото вставляйте прямыми ссылками на изображения.</p>
-              {adminMessage && <p className="admin-message">{adminMessage}</p>}
               <div className="admin-form-actions">
                 <button type="submit" className="login-submit-btn">{editingTourId ? 'Сохранить' : 'Добавить'}</button>
                 {editingTourId && <button type="button" className="admin-secondary-btn" onClick={resetTourForm}>Отмена</button>}

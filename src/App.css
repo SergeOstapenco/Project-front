@@ -251,6 +251,55 @@ body, html, #root {
 .admin-form h3 { font-family: 'Montserrat'; font-size: 1.25rem; }
 .admin-form-actions { display: flex; gap: 12px; align-items: center; }
 .admin-form-hint { color: var(--text-light); font-size: 0.9rem; line-height: 1.4; }
+.category-create-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+.category-create-row input {
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  outline: none;
+  font-size: 1rem;
+  font-family: inherit;
+}
+.category-manage-list {
+  display: grid;
+  gap: 8px;
+}
+.category-manage-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  font-weight: 800;
+}
+.category-manage-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.category-manage-item button {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.category-manage-item .danger-action {
+  background: #fee2e2;
+  color: var(--danger);
+}
+.category-manage-item button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .admin-secondary-btn {
   background: #f1f5f9;
   color: var(--text);
@@ -1091,6 +1140,8 @@ body, html, #root {
   .admin-table-head { display: none; }
   .admin-table-row { grid-template-columns: 1fr; }
   .admin-row-actions { justify-content: flex-start; }
+  .category-create-row { grid-template-columns: 1fr; }
+  .category-manage-item { grid-template-columns: 1fr; }
   .review-moderation-head { flex-direction: column; }
   .pending-review-card { grid-template-columns: 1fr; }
   .review-actions { justify-content: flex-start; flex-wrap: wrap; }
