@@ -760,6 +760,12 @@ body, html, #root {
 .page-title { font-family: 'Montserrat'; font-size: 2.5rem; margin-bottom: 40px; text-align: center; }
 .state-msg { text-align: center; padding: 100px; font-size: 1.2rem; font-weight: 700; color: var(--text-light); }
 
+.main-grid > .state-msg {
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: 80px 20px;
+}
+
 .tour-modal-backdrop {
   position: fixed;
   inset: 0;

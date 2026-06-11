@@ -1138,6 +1138,13 @@ function App() {
           <main className="main-grid">  
             {loading ? <div className="state-msg">Загрузка данных...</div> :
               error ? <div className="state-msg">{error}</div> :
+              filtered.length === 0 ? (
+                <div className="state-msg">
+                  {search.trim()
+                    ? 'По вашему запросу туры не найдены'
+                    : 'В этой категории пока нет туров'}
+                </div>
+              ) :
               filtered.map(item => (  
                 <TourCard 
                   key={item.id} 
