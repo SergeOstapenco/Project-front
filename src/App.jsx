@@ -1251,24 +1251,47 @@ function App() {
 
       {view === 'about' && (  
         <div className="page-content about-page">  
-          <h2 className="page-title">О нас</h2>  
-          <div className="about-hero"><p className="about-lead">Мы предлагаем уникальные путешествия по всему миру с 2020 года.</p></div>
+          <section className="about-intro">
+            <span className="about-kicker">TRAVELuxe</span>
+            <h2>Путешествия, которые легко выбрать и приятно планировать</h2>
+            <p>
+              Мы собрали каталог туров в одном месте: пользователь может сравнить направления,
+              посмотреть детали поездки, добавить тур в корзину, выбрать услуги и оформить заказ
+              без лишних звонков и переписок.
+            </p>
+          </section>
+
+          <section className="about-stats" aria-label="Показатели сервиса">
+            <div>
+              <strong>{tours.length}</strong>
+              <span>туров в каталоге</span>
+            </div>
+            <div>
+              <strong>3</strong>
+              <span>роли доступа</span>
+            </div>
+            <div>
+              <strong>24/7</strong>
+              <span>онлайн-бронирование</span>
+            </div>
+          </section>
+
           <div className="about-grid">
-            <div className="about-card-modern">
-              <div className="about-icon">🌍</div>
-              <h3>100+ Направлений</h3>
-              <p>От заснеженных вершин гор до лазурных берегов океана.</p>
-            </div>
-            <div className="about-card-modern">
-              <div className="about-icon">⭐</div>
-              <h3>Лучший сервис</h3>
-              <p>Заботимся о вашем комфорте на каждом этапе путешествия.</p>
-            </div>
-            <div className="about-card-modern">
-              <div className="about-icon">🛡️</div>
-              <h3>Надежность</h3>
-              <p>Ваша безопасность и страхование — наш главный приоритет.</p>
-            </div>
+            <article className="about-card-modern">
+              <span className="about-card-label">01</span>
+              <h3>Каталог без хаоса</h3>
+              <p>Туры можно искать по названию, фильтровать по категориям и открывать в подробном окне с описанием, галереей и отзывами.</p>
+            </article>
+            <article className="about-card-modern">
+              <span className="about-card-label">02</span>
+              <h3>Прозрачная стоимость</h3>
+              <p>В корзине сразу видно цену тура, количество людей, дополнительные услуги и итоговую сумму перед оплатой.</p>
+            </article>
+            <article className="about-card-modern">
+              <span className="about-card-label">03</span>
+              <h3>Контроль качества</h3>
+              <p>Администратор управляет турами и проверяет отзывы, чтобы в каталоге оставалась актуальная и полезная информация.</p>
+            </article>
           </div>
         </div>  
       )}
